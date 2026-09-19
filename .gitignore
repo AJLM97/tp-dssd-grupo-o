@@ -1,0 +1,56 @@
+# ==========================================
+# Archivos del Sistema Operativo y Editores
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==========================================
+# Dependencias (Monorepo, Frontend y Backend)
+# ==========================================
+node_modules/
+/frontend/node_modules/
+/backend/node_modules/
+.pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
+
+# ==========================================
+# Archivos de Variables de Entorno y Secretos
+# ==========================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+/frontend/.env*
+/backend/.env*
+!*.env.example
+
+# ==========================================
+# Compilación y Salidas de Desarrollo/Producción
+# ==========================================
+# NestJS (Backend)
+/backend/dist/
+/backend/coverage/
+
+# Next.js (Frontend)
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+
+# ==========================================
+# Registros y Logs
+# ==========================================
+logs/
+*.log
+
+# ==========================================
+# Caché de Herramientas
+# ==========================================
+.eslintcache
+.turbo/
