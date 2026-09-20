@@ -8,7 +8,7 @@ export class Usuario {
   id: number;
 
   @Column({ unique: true, nullable: false })
-  email: string;
+  usuario: string;
 
   @Column({ nullable: false })
   passwordHash: string;
