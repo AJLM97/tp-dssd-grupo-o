@@ -1,0 +1,210 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""Datos básicos del cliente que hizo la reserva."""
+type ClienteReserva {
+  """Apellido del cliente."""
+  apellido: String!
+
+  """Identificador del cliente."""
+  id: Int!
+
+  """Nombre del cliente."""
+  nombre: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+"""Estado actual de una reserva."""
+enum EstadoReserva {
+  CANCELADA
+  CONFIRMADA
+  EN_CURSO
+  FINALIZADA
+}
+
+"""Alquiler finalizado o reserva cancelada del cliente que consulta."""
+type HistorialClienteResultado {
+  """
+  Días de alquiler, redondeados hacia arriba con un mínimo de 1. Se calcula al consultar.
+  """
+  cantidadDias: Int!
+
+  """
+  FINALIZADA o CANCELADA. Una reserva CONFIRMADA o EN_CURSO cuyo período ya terminó se informa como FINALIZADA.
+  """
+  estado: EstadoReserva!
+
+  """Fin del alquiler."""
+  fechaFin: DateTime!
+
+  """Inicio del alquiler."""
+  fechaInicio: DateTime!
+
+  """Identificador de la reserva."""
+  id: Int!
+
+  """Importe total del alquiler."""
+  importeTotal: Float!
+
+  """Vehículo alquilado."""
+  vehiculo: VehiculoReserva!
+}
+
+type Query {
+  """Comprueba que el endpoint GraphQL se encuentra operativo."""
+  estadoGraphql: String!
+
+  """
+  Devuelve los alquileres finalizados y las reservas canceladas del cliente actual.
+  """
+  historialCliente: [HistorialClienteResultado!]!
+
+  """Consulta reservas aplicando filtros y el acceso del usuario actual."""
+  reservas(filtros: ReservasInput): [ReservaResultado!]!
+
+  """
+  Busca vehículos activos sin reservas superpuestas en el período solicitado.
+  """
+  vehiculosDisponibles(filtros: VehiculosDisponiblesInput!): [VehiculoDisponible!]!
+}
+
+"""Reserva con su cliente y su vehículo."""
+type ReservaResultado {
+  """Cliente que hizo la reserva."""
+  cliente: ClienteReserva!
+
+  """Estado de la reserva."""
+  estado: EstadoReserva!
+
+  """Fin del alquiler."""
+  fechaFin: DateTime!
+
+  """Inicio del alquiler."""
+  fechaInicio: DateTime!
+
+  """Identificador de la reserva."""
+  id: Int!
+
+  """Importe total del alquiler."""
+  importeTotal: Float!
+
+  """Precio diario registrado en la reserva."""
+  precioDiario: Float!
+
+  """Vehículo reservado."""
+  vehiculo: VehiculoReserva!
+}
+
+"""Filtros opcionales para consultar reservas. Se combinan entre sí."""
+input ReservasInput {
+  """
+  Filtra por cliente. Un CLIENTE solo puede indicar su propio id; indicar otro devuelve FORBIDDEN.
+  """
+  clienteId: Int
+
+  """Filtra por el estado de la reserva."""
+  estado: EstadoReserva
+
+  """
+  Fin del rango de fechas. Requiere fechaInicio y debe ser posterior a esta.
+  """
+  fechaFin: DateTime
+
+  """
+  Inicio del rango de fechas. Requiere fechaFin. Devuelve las reservas cuyo período se superpone con el rango.
+  """
+  fechaInicio: DateTime
+
+  """Filtra por la categoría del vehículo reservado."""
+  tipoVehiculo: TipoVehiculo
+
+  """Filtra por vehículo."""
+  vehiculoId: Int
+}
+
+"""Categoría del vehículo."""
+enum TipoVehiculo {
+  COUPE
+  HATCHBACK
+  PICKUP
+  SEDAN
+  SUV
+}
+
+"""Vehículo activo y libre durante todo el período consultado."""
+type VehiculoDisponible {
+  """Año de fabricación."""
+  anio: Int!
+
+  """Color del vehículo, si se informó."""
+  color: String
+
+  """Identificador del vehículo; se usa para crear la reserva."""
+  id: Int!
+
+  """Marca del vehículo."""
+  marca: String!
+
+  """Modelo del vehículo."""
+  modelo: String!
+
+  """Patente única del vehículo."""
+  patente: String!
+
+  """Precio de alquiler por día."""
+  precioDiario: Float!
+
+  """Categoría del vehículo."""
+  tipo: TipoVehiculo!
+}
+
+"""Datos básicos del vehículo reservado."""
+type VehiculoReserva {
+  """Identificador del vehículo."""
+  id: Int!
+
+  """Marca del vehículo."""
+  marca: String!
+
+  """Modelo del vehículo."""
+  modelo: String!
+
+  """Patente del vehículo."""
+  patente: String!
+
+  """Categoría del vehículo."""
+  tipo: TipoVehiculo!
+}
+
+"""
+Período obligatorio y filtros opcionales para buscar vehículos disponibles.
+"""
+input VehiculosDisponiblesInput {
+  """Fecha y hora hasta la que se solicita el vehículo."""
+  fechaFin: DateTime!
+
+  """Fecha y hora desde la que se solicita el vehículo."""
+  fechaInicio: DateTime!
+
+  """Marca. Coincidencia parcial, sin distinguir mayúsculas."""
+  marca: String
+
+  """Modelo. Coincidencia parcial, sin distinguir mayúsculas."""
+  modelo: String
+
+  """
+  Precio diario máximo (inclusivo). No puede ser negativo ni menor al mínimo.
+  """
+  precioDiarioMax: Float
+
+  """Precio diario mínimo (inclusivo). No puede ser negativo."""
+  precioDiarioMin: Float
+
+  """Categoría exacta del vehículo."""
+  tipo: TipoVehiculo
+}
