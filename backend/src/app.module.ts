@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { GraphqlStatusResolver } from './graphql/graphql-status.resolver';
 import { ReservasModule } from './reservas/reservas.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
+import { ClientesModule } from './clientes/clientes.module';
 
 @Module({
   imports: [
@@ -22,8 +23,9 @@ import { VehiculosModule } from './vehiculos/vehiculos.module';
       sortSchema: true,
       context: ({ req }: { req: Request }) => ({ req }),
     }),
-    ReservasModule,
+    ClientesModule,
     VehiculosModule,
+    ReservasModule,
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: process.env.DB_HOST || 'localhost',

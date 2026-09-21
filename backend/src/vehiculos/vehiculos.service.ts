@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vehiculo } from '../entities/vehiculo.entity';
 import { EstadoReserva } from '../enums/estado-reserva.enum';
 import { TipoVehiculo } from '../enums/tipo-vehiculo.enum';
+import { EstadoVehiculo } from '../enums/estado-vehiculo.enum';
 
 export interface FiltrosVehiculosDisponibles {
   fechaInicio: Date;
@@ -21,6 +22,46 @@ export class VehiculosService {
     @InjectRepository(Vehiculo)
     private readonly vehiculosRepository: Repository<Vehiculo>,
   ) {}
+
+  async crear(data: Partial<Vehiculo>): Promise<Vehiculo> {
+    const existe = await this.vehiculosRepository.findOne({ where: { patente: data.patente } });
+    if (existe) {
+      throw new BadRequestException('La patente ya se encuentra registrada');
+    }
+    const nuevo = this.vehiculosRepository.create({
+      ...data,
+      estado: EstadoVehiculo.DISPONIBLE,
+      activo: true,
+    });
+    return await this.vehiculosRepository.save(nuevo);
+  }
+
+  async obtenerTodos(): Promise<Vehiculo[]> {
+    return await this.vehiculosRepository.find();
+  }
+
+  async obtenerPorId(id: number): Promise<Vehiculo> {
+    const vehiculo = await this.vehiculosRepository.findOne({ where: { id } });
+    if (!vehiculo) {
+      throw new NotFoundException('Vehículo no encontrado');
+    }
+    return vehiculo;
+  }
+
+  async actualizar(id: number, data: Partial<Vehiculo>): Promise<Vehiculo> {
+    const vehiculo = await this.obtenerPorId(id);
+    if (data.patente && data.patente !== vehiculo.patente) {
+      throw new BadRequestException('La patente no se puede modificar');
+    }
+    Object.assign(vehiculo, data);
+    return await this.vehiculosRepository.save(vehiculo);
+  }
+
+  async bajaLogica(id: number): Promise<Vehiculo> {
+    const vehiculo = await this.obtenerPorId(id);
+    vehiculo.activo = false;
+    return await this.vehiculosRepository.save(vehiculo);
+  }
 
   async buscarDisponibles(
     filtros: FiltrosVehiculosDisponibles,
