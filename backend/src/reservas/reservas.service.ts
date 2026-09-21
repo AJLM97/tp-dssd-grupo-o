@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +12,7 @@ import { Vehiculo } from '../entities/vehiculo.entity';
 import { EstadoReserva } from '../enums/estado-reserva.enum';
 import { RolUsuario } from '../enums/rol-usuario.enum';
 import { TipoVehiculo } from '../enums/tipo-vehiculo.enum';
+import { Cliente } from '../entities/cliente.entity';
 
 export interface FiltrosReservas {
   clienteId?: number;
@@ -36,7 +38,104 @@ export class ReservasService {
   constructor(
     @InjectRepository(Reserva)
     private readonly reservasRepository: Repository<Reserva>,
+    @InjectRepository(Cliente)
+    private readonly clientesRepository: Repository<Cliente>,
+    @InjectRepository(Vehiculo)
+    private readonly vehiculosRepository: Repository<Vehiculo>,
   ) {}
+
+  async crearReserva(data: {
+    clienteId: number;
+    vehiculoId: number;
+    fechaInicio: string | Date;
+    fechaFin: string | Date;
+  }): Promise<Reserva> {
+    const inicio = new Date(data.fechaInicio);
+    const fin = new Date(data.fechaFin);
+    const ahora = new Date();
+
+    if (inicio <= ahora) {
+      throw new BadRequestException('La fecha de inicio debe ser futura.');
+    }
+
+    if (fin <= inicio) {
+      throw new BadRequestException(
+        'La fecha de finalización debe ser posterior a la fecha de inicio.',
+      );
+    }
+
+    const cliente = await this.clientesRepository.findOne({
+      where: { id: data.clienteId },
+    });
+    if (!cliente) {
+      throw new NotFoundException('El cliente no existe.');
+    }
+    if (!cliente.activo) {
+      throw new BadRequestException('El cliente se encuentra inactivo.');
+    }
+
+    const vehiculo = await this.vehiculosRepository.findOne({
+      where: { id: data.vehiculoId },
+    });
+    if (!vehiculo) {
+      throw new NotFoundException('El vehículo no existe.');
+    }
+    if (!vehiculo.activo) {
+      throw new BadRequestException('El vehículo se encuentra inactivo.');
+    }
+
+    // Regla de no superposición de fechas
+    const solapamiento = await this.reservasRepository
+      .createQueryBuilder('reserva')
+      .innerJoin('reserva.vehiculo', 'vehiculo')
+      .where('vehiculo.id = :vehiculoId', { vehiculoId: vehiculo.id })
+      .andWhere('reserva.estado = :estado', {
+        estado: EstadoReserva.CONFIRMADA,
+      })
+      .andWhere('reserva.fechaInicio < :fin AND reserva.fechaFin > :inicio', {
+        inicio,
+        fin,
+      })
+      .getOne();
+
+    if (solapamiento) {
+      throw new BadRequestException(
+        'El vehículo no se encuentra disponible en el período solicitado.',
+      );
+    }
+
+    const cantidadDias = this.calcularCantidadDias(inicio, fin);
+    const importeTotal = cantidadDias * Number(vehiculo.precioDiario);
+
+    const nuevaReserva = this.reservasRepository.create({
+      cliente,
+      vehiculo,
+      fechaInicio: inicio,
+      fechaFin: fin,
+      precioDiario: vehiculo.precioDiario,
+      importeTotal,
+      estado: EstadoReserva.CONFIRMADA,
+    });
+
+    return await this.reservasRepository.save(nuevaReserva);
+  }
+
+  async cancelarReserva(id: number): Promise<Reserva> {
+    const reserva = await this.reservasRepository.findOne({ where: { id } });
+    if (!reserva) {
+      throw new NotFoundException('La reserva no existe.');
+    }
+
+    const ahora = new Date();
+    if (new Date(reserva.fechaInicio) <= ahora) {
+      throw new BadRequestException(
+        'No se puede cancelar una reserva cuyo período ya ha comenzado.',
+      );
+    }
+
+    reserva.estado = EstadoReserva.CANCELADA;
+    return await this.reservasRepository.save(reserva);
+  }
 
   buscar(filtros: FiltrosReservas, usuarioActual: Usuario): Promise<Reserva[]> {
     this.validarFiltros(filtros);
