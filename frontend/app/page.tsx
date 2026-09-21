@@ -1,25 +1,37 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { client as apolloClient } from "@/lib/apollo-client";
 import {
-  INITIAL_CLIENTS,
-  INITIAL_RESERVATIONS,
-  INITIAL_VEHICLES,
-  RESERVATION_STATUS_OPTIONS,
-  VEHICLE_STATE_OPTIONS,
-  VEHICLE_TYPE_OPTIONS,
-  buildNextId,
-  calculateDays,
+  QUERY_VEHICULOS_DISPONIBLES,
+  QUERY_RESERVAS,
+  QUERY_HISTORIAL_CLIENTE,
+} from "@/lib/graphql";
+import {
   createEmptyClient,
   createEmptyVehicle,
+  normalizeDate,
+  overlaps,
+  isVehicleAvailable,
+  calculateDays,
   formatCurrency,
   formatDateTime,
   hasRentalStarted,
-  isVehicleAvailable,
-  normalizeDate,
-  overlaps,
   reservationStatusLabel,
+  VEHICLE_TYPE_OPTIONS,
+  VEHICLE_STATE_OPTIONS,
+  RESERVATION_STATUS_OPTIONS,
 } from "@/lib/rentar-mocks";
+import {
+  fetchVehiculos,
+  saveVehiculo,
+  deleteVehiculoApi,
+  fetchClientes,
+  saveCliente,
+  deleteClienteApi,
+  postReserva,
+  putCancelarReserva,
+} from "@/lib/api-rest";
 import type {
   AppRole,
   Client,
@@ -154,9 +166,60 @@ function getEffectiveReservationStatus(reservation: Reservation): ReservationSta
 export default function Home() {
   const [role, setRole] = useState<AppRole>("CLIENTE");
   const [section, setSection] = useState<UiSection>("DISPONIBILIDAD");
-  const [vehicles, setVehicles] = useState<Vehicle[]>(INITIAL_VEHICLES);
-  const [clients, setClients] = useState<Client[]>(INITIAL_CLIENTS);
-  const [reservations, setReservations] = useState<Reservation[]>(INITIAL_RESERVATIONS);
+
+  useEffect(() => {
+    localStorage.setItem("activeUserId", role === "ADMIN" ? "1" : "2");
+  }, [role]);
+
+  const reloadData = async () => {
+    try {
+      const [vehData, cliData] = await Promise.all([
+        fetchVehiculos(),
+        fetchClientes(),
+      ]);
+
+      const mappedVehicles = vehData.map((v: any) => ({
+        id: v.id,
+        licensePlate: v.patente || v.licensePlate,
+        brand: v.marca || v.brand,
+        model: v.modelo || v.model,
+        year: v.anio || v.year,
+        color: v.color || "",
+        type: v.tipo || v.type,
+        dailyPrice: Number(v.precioDiario || v.dailyPrice),
+        state: v.estado || v.state,
+        active: v.activo !== undefined ? v.activo : v.active,
+      }));
+
+      const mappedClients = cliData.map((c: any) => ({
+        id: c.id,
+        document: c.documento || c.document,
+        firstName: c.nombre || c.firstName,
+        lastName: c.apellido || c.lastName,
+        email: c.email,
+        phone: c.telefono || c.phone || "",
+        birthDate: c.fechaNacimiento || c.birthDate || "",
+        active: c.activo !== undefined ? c.activo : c.active,
+      }));
+
+      setVehicles(mappedVehicles);
+      setClients(mappedClients);
+
+      if (mappedClients.length > 0 && currentClientId === 0) {
+        setCurrentClientId(mappedClients[0].id);
+      }
+    } catch (error: any) {
+      console.error("Error al cargar datos:", error.message);
+    }
+  };
+
+  useEffect(() => {
+    reloadData();
+  }, []);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [historyRows, setHistoryRows] = useState<any[]>([]);
 
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(createEmptyVehicle());
   const [vehicleEditingId, setVehicleEditingId] = useState<number | null>(null);
@@ -167,7 +230,7 @@ export default function Home() {
   const [availabilityFilters, setAvailabilityFilters] = useState<AvailabilityFilters>(DEFAULT_AVAILABILITY_FILTERS);
   const [reservationFilters, setReservationFilters] = useState<ReservationFilters>(DEFAULT_RESERVATION_FILTERS);
 
-  const [currentClientId, setCurrentClientId] = useState<number>(INITIAL_CLIENTS[0]?.id ?? 0);
+  const [currentClientId, setCurrentClientId] = useState<number>(0);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const [reservationStartAt, setReservationStartAt] = useState("");
   const [reservationEndAt, setReservationEndAt] = useState("");
@@ -210,51 +273,97 @@ export default function Home() {
     });
   }, [currentClientId, reservationFilters, reservations, role, vehicles]);
 
-  const availableVehicles = useMemo(() => {
-    const startAt = normalizeDate(availabilityFilters.startAt);
-    const endAt = normalizeDate(availabilityFilters.endAt);
+  const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
 
-    if (!startAt || !endAt || endAt <= startAt) {
-      return [];
+  useEffect(() => {
+    async function cargarDisponibilidad() {
+      if (!availabilityFilters.startAt || !availabilityFilters.endAt) {
+        setAvailableVehicles([]);
+        return;
+      }
+
+      try {
+        const response = await apolloClient.query({
+          query: QUERY_VEHICULOS_DISPONIBLES,
+          variables: {
+            filtros: {
+              fechaInicio: new Date(availabilityFilters.startAt).toISOString(),
+              fechaFin: new Date(availabilityFilters.endAt).toISOString(),
+              tipo: availabilityFilters.vehicleType || undefined,
+              marca: availabilityFilters.brand || undefined,
+              modelo: availabilityFilters.model || undefined,
+              precioDiarioMin: availabilityFilters.minDailyPrice ? Number(availabilityFilters.minDailyPrice) : undefined,
+              precioDiarioMax: availabilityFilters.maxDailyPrice ? Number(availabilityFilters.maxDailyPrice) : undefined,
+            },
+          },
+          fetchPolicy: "network-only",
+        });
+
+        const data = response.data as { vehiculosDisponibles: any[] };
+
+        const mapped = data.vehiculosDisponibles.map((v: any) => ({
+          id: v.id,
+          licensePlate: v.patente,
+          brand: v.marca,
+          model: v.modelo,
+          year: v.anio,
+          color: v.color || "",
+          type: v.tipo,
+          dailyPrice: Number(v.precioDiario),
+          state: v.estado,
+          active: v.activo,
+        }));
+
+        setAvailableVehicles(mapped);
+      } catch (err: any) {
+        console.error("Error al consultar disponibilidad vía GraphQL:", err.message);
+      }
     }
 
-    return vehicles.filter((vehicle) => {
-      if (!vehicle.active) {
-        return false;
-      }
+    cargarDisponibilidad();
+  }, [availabilityFilters]);
 
-      if (
-        availabilityFilters.vehicleType &&
-        vehicle.type !== availabilityFilters.vehicleType
-      ) {
-        return false;
-      }
+  useEffect(() => {
+    async function cargarReservasGraphQL() {
+      if (section !== "RESERVAS") return;
 
-      if (
-        availabilityFilters.brand &&
-        !vehicle.brand.toLowerCase().includes(availabilityFilters.brand.toLowerCase())
-      ) {
-        return false;
-      }
+      try {
+        const response = await apolloClient.query({
+          query: QUERY_RESERVAS,
+          variables: {
+            filtros: {
+              clienteId: reservationFilters.clientId ? Number(reservationFilters.clientId) : undefined,
+              vehiculoId: reservationFilters.vehicleId ? Number(reservationFilters.vehicleId) : undefined,
+              tipoVehiculo: reservationFilters.vehicleType || undefined,
+              estado: reservationFilters.status || undefined,
+              fechaInicio: reservationFilters.startAt ? new Date(reservationFilters.startAt).toISOString() : undefined,
+              fechaFin: reservationFilters.endAt ? new Date(reservationFilters.endAt).toISOString() : undefined,
+            },
+          },
+          fetchPolicy: "network-only",
+        });
 
-      if (
-        availabilityFilters.model &&
-        !vehicle.model.toLowerCase().includes(availabilityFilters.model.toLowerCase())
-      ) {
-        return false;
-      }
+        const data = response.data as { reservas: any[] };
 
-      if (availabilityFilters.minDailyPrice && vehicle.dailyPrice < Number(availabilityFilters.minDailyPrice)) {
-        return false;
-      }
+        const mappedReservations = data.reservas.map((r: any) => ({
+          id: r.id,
+          clientId: r.cliente?.id,
+          vehicleId: r.vehiculo?.id,
+          startAt: r.fechaInicio,
+          endAt: r.fechaFin,
+          dailyPrice: Number(r.precioDiario),
+          totalAmount: Number(r.importeTotal),
+          status: r.estado,
+        }));
 
-      if (availabilityFilters.maxDailyPrice && vehicle.dailyPrice > Number(availabilityFilters.maxDailyPrice)) {
-        return false;
+        setReservations(mappedReservations);
+      } catch (err: any) {
+        console.error("Error al cargar reservas vía GraphQL:", err.message);
       }
+    }
 
-      return isVehicleAvailable(vehicle.id, startAt, endAt, reservations);
-    });
-  }, [availabilityFilters, reservations, vehicles]);
+    cargarReservasGraphQL();
+  }, [section, reservationFilters, role]);
 
   const reservationPreview = useMemo(() => {
     const vehicle = vehicles.find((item) => item.id === selectedVehicleId);
@@ -288,7 +397,7 @@ export default function Home() {
     setClientEditingId(null);
   }
 
-  function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleVehicleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback("");
 
@@ -297,60 +406,29 @@ export default function Home() {
       return;
     }
 
-    if (vehicleEditingId === null) {
-      const duplicated = vehicles.some(
-        (item) => item.licensePlate.toLowerCase() === vehicleForm.licensePlate.trim().toLowerCase(),
-      );
-
-      if (duplicated) {
-        setFeedback("La patente ya existe. Debe ser unica.");
-        return;
-      }
-
-      const nextVehicle: Vehicle = {
-        id: buildNextId(vehicles),
-        licensePlate: vehicleForm.licensePlate.trim().toUpperCase(),
-        brand: vehicleForm.brand.trim(),
-        model: vehicleForm.model.trim(),
-        year: Number(vehicleForm.year),
+    try {
+      const payload = {
+        patente: vehicleForm.licensePlate.trim().toUpperCase(),
+        marca: vehicleForm.brand.trim(),
+        modelo: vehicleForm.model.trim(),
+        anio: Number(vehicleForm.year),
         color: vehicleForm.color.trim(),
-        type: vehicleForm.type,
-        dailyPrice: Number(vehicleForm.dailyPrice),
-        state: "DISPONIBLE",
-        active: true,
+        tipo: vehicleForm.type,
+        precioDiario: Number(vehicleForm.dailyPrice),
+        estado: vehicleForm.state,
+        activo: vehicleForm.active,
       };
 
-      setVehicles((current) => [...current, nextVehicle]);
+      await saveVehiculo(payload, vehicleEditingId !== null, vehicleEditingId ?? undefined);
+      await reloadData();
       clearVehicleForm();
-      setFeedback("Vehiculo anadido con estado inicial DISPONIBLE.");
-      return;
+      setFeedback(vehicleEditingId ? "Vehículo actualizado en el backend." : "Vehículo añadido correctamente.");
+    } catch (err: any) {
+      setFeedback(err.message);
     }
-
-    setVehicles((current) =>
-      current.map((item) => {
-        if (item.id !== vehicleEditingId) {
-          return item;
-        }
-
-        return {
-          ...item,
-          brand: vehicleForm.brand.trim(),
-          model: vehicleForm.model.trim(),
-          year: Number(vehicleForm.year),
-          color: vehicleForm.color.trim(),
-          type: vehicleForm.type,
-          dailyPrice: Number(vehicleForm.dailyPrice),
-          state: vehicleForm.state,
-          active: vehicleForm.active,
-        };
-      }),
-    );
-
-    clearVehicleForm();
-    setFeedback("Vehiculo actualizado. La patente no se puede modificar.");
   }
 
-  function handleClientSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleClientSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFeedback("");
 
@@ -359,57 +437,56 @@ export default function Home() {
       return;
     }
 
-    if (clientEditingId === null) {
-      const duplicatedDocument = clients.some((item) => item.document === clientForm.document.trim());
-      if (duplicatedDocument) {
-        setFeedback("El documento ya existe.");
-        return;
-      }
-
-      const duplicatedEmail = clients.some((item) => item.email.toLowerCase() === clientForm.email.trim().toLowerCase());
-      if (duplicatedEmail) {
-        setFeedback("El email ya existe.");
-        return;
-      }
-
-      const nextClient: Client = {
-        id: buildNextId(clients),
-        document: clientForm.document.trim(),
-        firstName: clientForm.firstName.trim(),
-        lastName: clientForm.lastName.trim(),
+    try {
+      const payload = {
+        documento: clientForm.document.trim(),
+        nombre: clientForm.firstName.trim(),
+        apellido: clientForm.lastName.trim(),
         email: clientForm.email.trim().toLowerCase(),
-        phone: clientForm.phone.trim(),
-        birthDate: clientForm.birthDate,
-        active: clientForm.active,
+        telefono: clientForm.phone.trim(),
+        fechaNacimiento: clientForm.birthDate,
+        activo: clientForm.active,
       };
 
-      setClients((current) => [...current, nextClient]);
+      await saveCliente(payload, clientEditingId !== null, clientEditingId ?? undefined);
+      await reloadData();
       clearClientForm();
-      setFeedback("Cliente anadido correctamente.");
-      return;
+      setFeedback(clientEditingId ? "Cliente actualizado en el backend." : "Cliente añadido correctamente.");
+    } catch (err: any) {
+      setFeedback(err.message);
     }
+  }
 
-    setClients((current) =>
-      current.map((item) => {
-        if (item.id !== clientEditingId) {
-          return item;
-        }
+  async function handleVehicleDelete(id: number) {
+    try {
+      await deleteVehiculoApi(id);
+      await reloadData();
+      setFeedback("Baja lógica de vehículo realizada.");
+    } catch (err: any) {
+      setFeedback(err.message);
+    }
+  }
 
-        return {
-          ...item,
-          document: clientForm.document.trim(),
-          firstName: clientForm.firstName.trim(),
-          lastName: clientForm.lastName.trim(),
-          email: clientForm.email.trim().toLowerCase(),
-          phone: clientForm.phone.trim(),
-          birthDate: clientForm.birthDate,
-          active: clientForm.active,
-        };
-      }),
-    );
+  async function handleClientDelete(id: number) {
+    try {
+      await deleteClienteApi(id);
+      await reloadData();
+      setFeedback("Baja lógica de cliente realizada.");
+    } catch (err: any) {
+      setFeedback(err.message);
+    }
+  }
 
-    clearClientForm();
-    setFeedback("Cliente actualizado.");
+  function handleRoleChange(newRole: AppRole) {
+    setRole(newRole);
+    const userId = newRole === "ADMIN" ? "1" : "2";
+    localStorage.setItem("activeUserId", userId);
+
+    if (newRole === "ADMIN") {
+      setSection("VEHICULOS");
+    } else {
+      setSection("DISPONIBILIDAD");
+    }
   }
 
   function startVehicleEdition(vehicle: Vehicle) {
@@ -442,124 +519,64 @@ export default function Home() {
     setSection("CLIENTES");
   }
 
-  function handleCreateReservation() {
+  async function handleCreateReservation() {
     setFeedback("");
 
-    if (!currentClient) {
-      setFeedback("Selecciona un cliente valido.");
+    if (!currentClient || !selectedVehicleId || !reservationStartAt || !reservationEndAt) {
+      setFeedback("Completa cliente, vehículo y rango de fechas.");
       return;
     }
 
-    if (!currentClient.active) {
-      setFeedback("El cliente esta inactivo. No puede reservar.");
-      return;
+    try {
+      await postReserva({
+        clienteId: currentClient.id,
+        vehiculoId: selectedVehicleId,
+        fechaInicio: new Date(reservationStartAt).toISOString(),
+        fechaFin: new Date(reservationEndAt).toISOString(),
+      });
+
+      await reloadData();
+      setSelectedVehicleId(null);
+      setReservationStartAt("");
+      setReservationEndAt("");
+      setFeedback("Reserva confirmada e ingresada en el backend.");
+    } catch (err: any) {
+      setFeedback(err.message);
     }
-
-    const vehicle = vehicles.find((item) => item.id === selectedVehicleId);
-    if (!vehicle) {
-      setFeedback("Selecciona un vehiculo.");
-      return;
-    }
-
-    if (!vehicle.active) {
-      setFeedback("El vehiculo esta inactivo. No puede reservarse.");
-      return;
-    }
-
-    const startAt = normalizeDate(reservationStartAt);
-    const endAt = normalizeDate(reservationEndAt);
-
-    if (!startAt || !endAt) {
-      setFeedback("Debes ingresar fecha y hora de inicio y fin.");
-      return;
-    }
-
-    if (startAt.getTime() <= Date.now()) {
-      setFeedback("La fecha de inicio debe ser futura.");
-      return;
-    }
-
-    if (endAt <= startAt) {
-      setFeedback("La fecha de finalizacion debe ser posterior al inicio.");
-      return;
-    }
-
-    if (!isVehicleAvailable(vehicle.id, startAt, endAt, reservations)) {
-      setFeedback("El vehiculo no esta disponible durante todo el periodo.");
-      return;
-    }
-
-    const days = calculateDays(startAt, endAt);
-    const totalAmount = days * vehicle.dailyPrice;
-
-    const nextReservation: Reservation = {
-      id: buildNextId(reservations),
-      clientId: currentClient.id,
-      vehicleId: vehicle.id,
-      startAt: startAt.toISOString(),
-      endAt: endAt.toISOString(),
-      dailyPrice: vehicle.dailyPrice,
-      totalAmount,
-      status: "CONFIRMADA",
-    };
-
-    setReservations((current) => [...current, nextReservation]);
-    setVehicles((current) => current.map((item) => (item.id === vehicle.id ? { ...item, state: "RESERVADO" } : item)));
-    setSelectedVehicleId(null);
-    setReservationStartAt("");
-    setReservationEndAt("");
-    setFeedback(`Reserva confirmada. Importe total: ${formatCurrency(totalAmount)}.`);
   }
 
-  function handleCancelReservation(reservationId: number) {
+  async function handleCancelReservation(reservationId: number) {
     setFeedback("");
 
-    const target = reservations.find((item) => item.id === reservationId);
-    if (!target) {
-      setFeedback("No se encontro la reserva.");
-      return;
+    try {
+      await putCancelarReserva(reservationId);
+      await reloadData();
+      setFeedback("Reserva cancelada en el backend.");
+    } catch (err: any) {
+      setFeedback(err.message);
     }
+  }
 
-    if (hasRentalStarted(target.startAt)) {
-      setFeedback("No podes cancelar: el periodo de alquiler ya comenzo.");
-      return;
-    }
+  useEffect(() => {
+    async function cargarHistorial() {
+      if (section !== "HISTORIAL") return;
 
-    setReservations((current) => current.map((item) => (item.id === reservationId ? { ...item, status: "CANCELADA" } : item)));
-
-    setVehicles((current) =>
-      current.map((vehicle) => {
-        if (vehicle.id !== target.vehicleId) {
-          return vehicle;
-        }
-
-        const hasActiveFuture = reservations.some((reservation) => {
-          if (reservation.id === reservationId || reservation.vehicleId !== vehicle.id) {
-            return false;
-          }
-
-          return reservation.status === "CONFIRMADA";
+      try {
+        const response = await apolloClient.query({
+          query: QUERY_HISTORIAL_CLIENTE,
+          fetchPolicy: "network-only",
         });
 
-        return {
-          ...vehicle,
-          state: hasActiveFuture ? "RESERVADO" : "DISPONIBLE",
-        };
-      }),
-    );
+        const data = response.data as { historialCliente: any[] };
 
-    setFeedback("Reserva cancelada. El historial de alquileres conserva el registro en estado CANCELADA.");
-  }
+        setHistoryRows(data.historialCliente);
+      } catch (err: any) {
+        console.error("Error al consultar historial vía GraphQL:", err.message);
+      }
+    }
 
-  const historyRows = useMemo(() => {
-    return reservations
-      .filter((reservation) => reservation.clientId === currentClientId)
-      .map((reservation) => ({
-        ...reservation,
-        status: getEffectiveReservationStatus(reservation),
-      }))
-      .filter((reservation) => reservation.status === "FINALIZADA" || reservation.status === "CANCELADA");
-  }, [currentClientId, reservations]);
+    cargarHistorial();
+  }, [section]);
 
   return (
     <main className="min-h-screen bg-zinc-100 px-4 py-6 text-zinc-900">
@@ -575,7 +592,7 @@ export default function Home() {
               labelClassName="text-zinc-50"
               selectClassName="border-zinc-200 bg-zinc-100 text-zinc-800"
               value={role}
-              onChange={(event) => setRole(event.target.value as AppRole)}
+              onChange={(event) => handleRoleChange(event.target.value as AppRole)}
             >
               <option value="CLIENTE">CLIENTE</option>
               <option value="ADMIN">ADMIN</option>
@@ -606,9 +623,8 @@ export default function Home() {
               key={item}
               type="button"
               onClick={() => setSection(item)}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                section === item ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 hover:bg-zinc-200"
-              }`}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${section === item ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 hover:bg-zinc-200"
+                }`}
             >
               {SECTION_LABELS[item]}
             </button>
@@ -695,11 +711,7 @@ export default function Home() {
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                setVehicles((current) =>
-                                  current.map((item) => (item.id === vehicle.id ? { ...item, active: !item.active } : item)),
-                                )
-                              }
+                              onClick={() => handleVehicleDelete(vehicle.id)}
                               className="rounded border border-zinc-300 px-2 py-1 text-xs"
                             >
                               {vehicle.active ? "Baja logica" : "Reactivar"}
@@ -771,11 +783,7 @@ export default function Home() {
                             </button>
                             <button
                               type="button"
-                              onClick={() =>
-                                setClients((current) =>
-                                  current.map((item) => (item.id === client.id ? { ...item, active: !item.active } : item)),
-                                )
-                              }
+                              onClick={() => handleClientDelete(client.id)}
                               className="rounded border border-zinc-300 px-2 py-1 text-xs"
                             >
                               {client.active ? "Baja logica" : "Reactivar"}
