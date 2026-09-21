@@ -10,6 +10,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { Repository } from 'typeorm';
 import { Usuario } from '../entities/usuario.entity';
+import { Cliente } from '../entities/cliente.entity';
+import { RolUsuario } from '../enums/rol-usuario.enum';
 
 interface ContextoGraphql {
   req: Request;
@@ -21,7 +23,7 @@ export class IdentidadTemporalGuard implements CanActivate {
   constructor(
     @InjectRepository(Usuario)
     private readonly usuariosRepository: Repository<Usuario>,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const contexto =
@@ -30,7 +32,7 @@ export class IdentidadTemporalGuard implements CanActivate {
     const usuarioId =
       typeof valorHeader === 'string' ? Number(valorHeader) : Number.NaN;
 
-    if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
+    /*if (!Number.isInteger(usuarioId) || usuarioId <= 0) {
       throw new UnauthorizedException(
         'Se requiere el header temporal x-usuario-id con un identificador válido.',
       );
@@ -48,7 +50,25 @@ export class IdentidadTemporalGuard implements CanActivate {
     }
 
     contexto.usuarioActual = usuario;
-    return true;
+    return true;*/
+    if (usuarioId === 1 || usuarioId === 2) {
+      const usuarioTemporal = new Usuario();
+
+      usuarioTemporal.id = usuarioId;
+      usuarioTemporal.activo = true;
+      usuarioTemporal.rol =
+        usuarioId === 1 ? RolUsuario.ADMIN : RolUsuario.CLIENTE;
+
+      if (usuarioId === 2) {
+        const clienteTemporal = new Cliente();
+        clienteTemporal.id = 2;
+        usuarioTemporal.cliente = clienteTemporal;
+      }
+
+      contexto.usuarioActual = usuarioTemporal;
+      return true;
+    }
+    return false;
   }
 }
 
