@@ -14,6 +14,13 @@ import { RolUsuario } from '../enums/rol-usuario.enum';
 import { TipoVehiculo } from '../enums/tipo-vehiculo.enum';
 import { Cliente } from '../entities/cliente.entity';
 
+export interface CrearReservaInput {
+  idCliente: number;
+  idVehiculo: number;
+  fechaInicio: string;
+  fechaFin: string;
+}
+
 export interface FiltrosReservas {
   clienteId?: number;
   vehiculoId?: number;
@@ -44,7 +51,9 @@ export class ReservasService {
     private readonly vehiculosRepository: Repository<Vehiculo>,
   ) {}
 
-  async crearReserva(data: {
+  
+
+  /*async crearReserva(data: {
     clienteId: number;
     vehiculoId: number;
     fechaInicio: string | Date;
@@ -107,6 +116,7 @@ export class ReservasService {
     const cantidadDias = this.calcularCantidadDias(inicio, fin);
     const importeTotal = cantidadDias * Number(vehiculo.precioDiario);
 
+
     const nuevaReserva = this.reservasRepository.create({
       cliente,
       vehiculo,
@@ -118,7 +128,56 @@ export class ReservasService {
     });
 
     return await this.reservasRepository.save(nuevaReserva);
+  }*/
+
+  async crearReserva(body: CrearReservaInput) {
+    if (!body) {
+      throw new BadRequestException('El cuerpo de la solicitud no puede estar vacío.');
+    }
+
+    const { idCliente, idVehiculo, fechaInicio, fechaFin } = body;
+
+    if (!idCliente || !idVehiculo || !fechaInicio || !fechaFin) {
+      throw new BadRequestException('Todos los campos son obligatorios.');
+    }
+
+    // 1. Buscar las entidades asociadas
+    const cliente = await this.clientesRepository.findOne({ where: { id: idCliente } });
+    if (!cliente) {
+      throw new NotFoundException(`No se encontró el cliente con ID ${idCliente}.`);
+    }
+
+    const vehiculo = await this.vehiculosRepository.findOne({ where: { id: idVehiculo } });
+    if (!vehiculo) {
+      throw new NotFoundException(`No se encontró el vehículo con ID ${idVehiculo}.`);
+    }
+
+    // 2. Parsear fechas y calcular días
+    const inicio = new Date(fechaInicio);
+    const fin = new Date(fechaFin);
+
+    const diferenciaTiempo = fin.getTime() - inicio.getTime();
+    const dias = Math.ceil(diferenciaTiempo / (1000 * 3600 * 24));
+
+    if (dias <= 0) {
+      throw new BadRequestException('La fecha de fin debe ser posterior a la fecha de inicio.');
+    }
+
+    // 3. Calcular importe total
+    const importeTotal = dias * vehiculo.precioDiario;
+
+    // 4. Instanciar y guardar la reserva
+    const nuevaReserva = this.reservasRepository.create({
+      cliente,
+      vehiculo,
+      fechaInicio: inicio,
+      fechaFin: fin,
+      estado: EstadoReserva.CONFIRMADA,
+    });
+
+    return await this.reservasRepository.save(nuevaReserva);
   }
+
 
   async cancelarReserva(id: number): Promise<Reserva> {
     const reserva = await this.reservasRepository.findOne({ where: { id } });

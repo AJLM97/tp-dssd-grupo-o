@@ -31,10 +31,11 @@ import { ClientesModule } from './clientes/clientes.module';
       host: process.env.DB_HOST || 'localhost',
       port: parseInt(process.env.DB_PORT || '3306', 10),
       username: process.env.DB_USERNAME || 'root',
-      password: process.env.DB_PASSWORD || '',
+      password: process.env.DB_PASSWORD || '1234',
       database: process.env.DB_NAME || 'rentar_db',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // Crea las tablas automáticamente en desarrollo
+      dropSchema: false,
     }),
   ],
   controllers: [AppController],

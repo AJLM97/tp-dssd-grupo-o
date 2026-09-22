@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { ClientesService } from './clientes.service';
 import { Cliente } from '../entities/cliente.entity';
 
@@ -10,6 +10,18 @@ export class ClientesController {
 
   @Post()
   @ApiOperation({ summary: 'Alta de un nuevo cliente' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        documento: { type: 'string', example: '12345678' },
+        nombre: { type: 'string', example: 'Juan' },
+        apellido: { type: 'string', example: 'Pérez' },
+        email: { type: 'string', example: 'juan.perez@email.com' },
+      },
+      required: ['documento', 'nombre', 'apellido', 'email'],
+    },
+  })
   @ApiResponse({ status: 201, description: 'Cliente creado correctamente.', type: Cliente })
   @ApiResponse({ status: 400, description: 'Documento o email ya registrado.' })
   crear(@Body() body: Partial<Cliente>) {
@@ -33,6 +45,18 @@ export class ClientesController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Modificar datos de un cliente' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        documento: { type: 'string', example: '12345678' },
+        nombre: { type: 'string', example: 'Juan' },
+        apellido: { type: 'string', example: 'Pérez' },
+        email: { type: 'string', example: 'juan.perez@email.com' },
+      },
+      required: ['documento', 'nombre', 'apellido', 'email'],
+    },
+  })
   @ApiResponse({ status: 200, description: 'Cliente actualizado exitosamente.', type: Cliente })
   @ApiResponse({ status: 400, description: 'Documento o email en conflicto.' })
   @ApiResponse({ status: 404, description: 'Cliente no encontrado.' })

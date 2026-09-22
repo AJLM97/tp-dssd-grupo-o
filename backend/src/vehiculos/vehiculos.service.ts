@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Vehiculo } from '../entities/vehiculo.entity';
@@ -23,7 +23,7 @@ export class VehiculosService {
     private readonly vehiculosRepository: Repository<Vehiculo>,
   ) {}
 
-  async crear(data: Partial<Vehiculo>): Promise<Vehiculo> {
+  /*async crear(data: Partial<Vehiculo>): Promise<Vehiculo> {
     const existe = await this.vehiculosRepository.findOne({ where: { patente: data.patente } });
     if (existe) {
       throw new BadRequestException('La patente ya se encuentra registrada');
@@ -34,7 +34,30 @@ export class VehiculosService {
       activo: true,
     });
     return await this.vehiculosRepository.save(nuevo);
-  }
+  }*/
+
+  async crear(body: any) {
+    const { patente } = body;
+
+    // 1. Verificación previa
+    if (patente) {
+      const existe = await this.vehiculosRepository.findOne({ where: { patente } });
+      if (existe) {
+        throw new ConflictException(`La patente ${patente} ya se encuentra registrada.`);
+      }
+    }
+
+    try {
+      // 2. Intento de guardado
+      const nuevoVehiculo = this.vehiculosRepository.create(body);
+      return await this.vehiculosRepository.save(nuevoVehiculo);
+    } catch (error) {
+      // Si ocurre un error inesperado de base de datos, mostramos el detalle en consola
+      console.error('Error al crear vehículo:', error);
+      throw new InternalServerErrorException('Error al registrar el vehículo en la base de datos.');
+    }
+  
+}
 
   async obtenerTodos(): Promise<Vehiculo[]> {
     return await this.vehiculosRepository.find();
@@ -49,6 +72,9 @@ export class VehiculosService {
   }
 
   async actualizar(id: number, data: Partial<Vehiculo>): Promise<Vehiculo> {
+    if (!data) {
+      throw new BadRequestException('Debe enviar datos para actualizar el vehículo');
+    }
     const vehiculo = await this.obtenerPorId(id);
     if (data.patente && data.patente !== vehiculo.patente) {
       throw new BadRequestException('La patente no se puede modificar');

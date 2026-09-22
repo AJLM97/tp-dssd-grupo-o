@@ -26,6 +26,7 @@ export class Vehiculo {
   @Column({
     type: 'enum',
     enum: TipoVehiculo,
+    default: TipoVehiculo.SEDAN,
   })
   tipo: TipoVehiculo;
 

@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { VehiculosService } from './vehiculos.service';
 import { Vehiculo } from '../entities/vehiculo.entity';
+
 
 @ApiTags('Vehículos')
 @Controller('vehiculos')
@@ -12,6 +13,21 @@ export class VehiculosController {
   @ApiOperation({ summary: 'Alta de un nuevo vehículo (queda en estado DISPONIBLE)' })
   @ApiResponse({ status: 201, description: 'Vehículo creado correctamente.', type: Vehiculo })
   @ApiResponse({ status: 400, description: 'La patente ya se encuentra registrada.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        patente: { type: 'string', example: 'AA123BC' },
+        marca: { type: 'string', example: 'Toyota' },
+        modelo: { type: 'string', example: 'Corolla' },
+        anio: { type: 'number', example: 2022 },
+        color: { type: 'string', example: 'Gris' },
+        tipo: { type: 'string', example: 'SEDAN' },
+        precioDiario: { type: 'number', example: 45000 },
+      },
+      required: ['patente', 'marca', 'modelo', 'anio', 'precioDiario'],
+    },
+  })
   crear(@Body() body: Partial<Vehiculo>) {
     return this.vehiculosService.crear(body);
   }
@@ -33,6 +49,38 @@ export class VehiculosController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Modificar datos de un vehículo (patente no modificable)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        marca: {
+          type: 'string',
+          example: 'Toyota',
+        },
+        modelo: {
+          type: 'string',
+          example: 'Corolla',
+        },
+        anio: {
+          type: 'number',
+          example: 2023,
+        },
+        color: {
+          type: 'string',
+          example: 'Negro',
+        },
+        tipo: {
+          type: 'string',
+          enum: ['SEDAN', 'SUV', 'PICKUP', 'COUPE', 'HATCHBACK'],
+          example: 'SEDAN',
+        },
+        precioDiario: {
+          type: 'number',
+          example: 50000,
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 200, description: 'Vehículo actualizado exitosamente.', type: Vehiculo })
   @ApiResponse({ status: 400, description: 'Intento de modificación de la patente no permitido.' })
   @ApiResponse({ status: 404, description: 'Vehículo no encontrado.' })

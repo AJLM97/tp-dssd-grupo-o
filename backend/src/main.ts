@@ -13,6 +13,7 @@ async function bootstrap() {
     .setTitle('API Rentar - Web Services')
     .setDescription('Documentación de la API REST para el TP de Sistemas Distribuidos (UNLa)')
     .setVersion('1.0')
+    .addServer('http://localhost:3000')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
