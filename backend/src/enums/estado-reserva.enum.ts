@@ -1,0 +1,6 @@
+export enum EstadoReserva {
+    CONFIRMADA = 'CONFIRMADA',
+    EN_CURSO = 'EN_CURSO',
+    FINALIZADA = 'FINALIZADA',
+    CANCELADA = 'CANCELADA',
+}
