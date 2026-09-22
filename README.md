@@ -1,6 +1,8 @@
-# Sistema Web para Rentar
+# Rentar - Sistema de Gestión de Alquiler de Vehículos
 
-Proyecto desarrollado para la asignatura [Desarrollo de Software en Sistemas Distribuidos] - [2026 - Segundo Cuatrimestre]. Este sistema web permite administrar la flota de vehículos, los clientes y los alquileres realizados.
+Este repositorio contiene la solución monorepo para el proyecto **API Rentar**, desarrollada para la materia *Desarrollo de Software en Sistemas Distribuidos* (Cátedra: Amaro - Aguirre, 2º Cuatrimestre 2026).
+
+El sistema administra la gestión de clientes, flota de vehículos y reservas mediante una arquitectura desacoplada con API REST, soporte para GraphQL y una interfaz web.
 
 ## 👥 Equipo de Trabajo
 - **Ledesma Miño, Alejandro Javier** (@AJLM97)
@@ -8,12 +10,6 @@ Proyecto desarrollado para la asignatura [Desarrollo de Software en Sistemas Dis
 - **Ponzo, Valentina** (@valentinaponzo)
 - **Soncini, Valentino Marco** (@valensoncini)
 - **Retamar, Alan Franco** (@AlanRetamar)
-
-# Rentar - Sistema de Gestión de Alquiler de Vehículos
-
-Este repositorio contiene la solución monorepo para el proyecto **API Rentar**, desarrollada para la materia *Desarrollo de Software en Sistemas Distribuidos* (Cátedra: Amaro - Aguirre, 2º Cuatrimestre 2026).
-
-El sistema administra la gestión de clientes, flota de vehículos y reservas mediante una arquitectura desacoplada con API REST, soporte para GraphQL y una interfaz web.
 
 ---
 
