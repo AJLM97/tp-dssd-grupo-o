@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package rental;
+
+option java_multiple_files = true;
+option java_package = "com.rentar.rentalservice.grpc";
+option java_outer_classname = "RentalProto";
+
+service RentalService {
+  rpc CreateRental (CreateRentalRequest) returns (RentalResponse);
+  rpc GetRentals (GetRentalsRequest) returns (GetRentalsResponse);
+  rpc CancelRental (CancelRentalRequest) returns (RentalResponse);
+  rpc GetRentalHistory (GetRentalHistoryRequest) returns (GetRentalsResponse);
+}
+
+enum RentalStatus {
+  RENTAL_STATUS_UNSPECIFIED = 0;
+  CONFIRMADA = 1;
+  EN_CURSO = 2;
+  FINALIZADA = 3;
+  CANCELADA = 4;
+}
+
+message RentalResponse {
+  int64 id = 1;
+  int64 customer_id = 2;
+  int64 vehicle_id = 3;
+  string fecha_inicio = 4;
+  string fecha_fin = 5;
+  double precio_diario = 6;
+  double importe_total = 7;
+  RentalStatus estado = 8;
+}
+
+message CreateRentalRequest {
+  int64 customer_id = 1;
+  int64 vehicle_id = 2;
+  string fecha_inicio = 3;
+  string fecha_fin = 4;
+  double precio_diario = 5;
+}
+
+message GetRentalsRequest {
+  int64 customer_id = 1;
+  int64 vehicle_id = 2;
+}
+
+message GetRentalsResponse {
+  repeated RentalResponse rentals = 1;
+}
+
+message CancelRentalRequest {
+  int64 rental_id = 1;
+  int64 customer_id = 2;
+}
+
+message GetRentalHistoryRequest {
+  int64 customer_id = 1;
+}

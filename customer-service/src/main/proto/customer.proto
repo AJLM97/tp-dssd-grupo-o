@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package customer;
+
+option java_multiple_files = true;
+option java_package = "com.rentar.customerservice.grpc";
+option java_outer_classname = "CustomerProto";
+
+service CustomerService {
+  rpc CreateCustomer (CreateCustomerRequest) returns (CustomerResponse);
+  rpc UpdateCustomer (UpdateCustomerRequest) returns (CustomerResponse);
+  rpc DeleteCustomer (DeleteCustomerRequest) returns (CustomerResponse);
+  rpc GetCustomers (GetCustomersRequest) returns (GetCustomersResponse);
+  rpc GetCustomerById (GetCustomerByIdRequest) returns (CustomerResponse);
+  rpc ValidateCustomer (ValidateCustomerRequest) returns (ValidateCustomerResponse);
+}
+
+message CustomerResponse {
+  int64 id = 1;
+  string documento = 2;
+  string nombre = 3;
+  string apellido = 4;
+  string email = 5;
+  string telefono = 6;
+  string fecha_nacimiento = 7;
+  bool activo = 8;
+}
+
+message CreateCustomerRequest {
+  string documento = 1;
+  string nombre = 2;
+  string apellido = 3;
+  string email = 4;
+  string password = 5;
+  string telefono = 6;
+  string fecha_nacimiento = 7;
+}
+
+message UpdateCustomerRequest {
+  int64 id = 1;
+  string nombre = 2;
+  string apellido = 3;
+  string email = 4;
+  string telefono = 5;
+  string fecha_nacimiento = 6;
+}
+
+message DeleteCustomerRequest {
+  int64 id = 1;
+}
+
+message GetCustomersRequest {
+  bool solo_activos = 1;
+}
+
+message GetCustomersResponse {
+  repeated CustomerResponse customers = 1;
+}
+
+message GetCustomerByIdRequest {
+  int64 id = 1;
+}
+
+message ValidateCustomerRequest {
+  int64 id = 1;
+}
+
+message ValidateCustomerResponse {
+  bool valido = 1;
+  bool activo = 2;
+  string mensaje = 3;
+}
