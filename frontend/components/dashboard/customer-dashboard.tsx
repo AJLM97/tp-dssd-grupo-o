@@ -1,6 +1,7 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
+import Image from "next/image";
 import { Input, SectionCard, Select } from "@/components/ui/form-controls";
 import {
   calculateDays,
@@ -52,7 +53,7 @@ export function CustomerDashboard({
     <>
       {section === "DISPONIBILIDAD" ? (
         <div className="grid gap-5">
-          <SectionCard title="Pantalla de consulta de disponibilidad" description="Filtros y selectores de fecha/hora. Inicio y fin son obligatorios para buscar disponibilidad real del periodo.">
+          <SectionCard title="Encontrá tu próximo vehículo" description="Elegí las fechas de tu viaje y filtrá las opciones disponibles.">
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
               <Input label="Inicio *" type="datetime-local" value={availabilityFilters.startAt} onChange={(event) => setAvailabilityFilters((current) => ({ ...current, startAt: event.target.value }))} />
               <Input label="Fin *" type="datetime-local" value={availabilityFilters.endAt} onChange={(event) => setAvailabilityFilters((current) => ({ ...current, endAt: event.target.value }))} />
@@ -70,7 +71,7 @@ export function CustomerDashboard({
             </div>
           </SectionCard>
 
-          <SectionCard title="Listado de disponibles" description="Solo vehiculos activos y libres durante todo el periodo.">
+          <SectionCard title="Vehículos para tus fechas" description="Opciones disponibles durante todo el período seleccionado.">
             {!availabilityFilters.startAt || !availabilityFilters.endAt ? <p className="text-sm text-zinc-600">Ingresa fecha/hora de inicio y fin para buscar.</p> : null}
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
@@ -85,11 +86,26 @@ export function CustomerDashboard({
               </table>
             </div>
           </SectionCard>
+
+          <section className="customer-vehicle-feature" aria-label="Rentar: vehículos para tu próximo viaje">
+            <Image
+              src="/images/Captura%20de%20pantalla%202026-10-11%20173300.jpg"
+              alt="Volkswagen Gol GT-S avanzando por una calle arbolada"
+              fill
+              priority
+              sizes="(max-width: 768px) 100vw, 1200px"
+            />
+            <div className="customer-vehicle-feature-copy">
+              <p>Rentar · Tu próximo viaje</p>
+              <h2>Elegí el camino.<br />Nosotros ponemos las ruedas.</h2>
+            </div>
+            <span className="customer-vehicle-feature-index">MOVILIDAD, A TU MANERA</span>
+          </section>
         </div>
       ) : null}
 
       {section === "ALTA_RESERVA" ? (
-        <SectionCard title="Flujo de creacion de reserva" description="Incluye confirmacion y calculo de importe total con reglas de negocio.">
+        <SectionCard title="Nueva reserva" description="Elegí el vehículo y las fechas para ver el importe estimado.">
           <div className="grid gap-3 md:grid-cols-2">
             <Select label="Vehiculo *" value={selectedVehicleId ? String(selectedVehicleId) : ""} onChange={(event) => setSelectedVehicleId(event.target.value ? Number(event.target.value) : null)}>
               <option value="">Seleccionar vehiculo</option>

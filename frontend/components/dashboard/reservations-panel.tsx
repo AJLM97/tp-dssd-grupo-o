@@ -37,7 +37,7 @@ export function ReservationsPanel({
 }: ReservationsPanelProps) {
   return (
     <div className="grid gap-5">
-      <SectionCard title="Pantalla de consulta de reservas activas" description="Vista unificada para cliente/admin con filtros opcionales y boton de cancelacion.">
+      <SectionCard title={role === "CLIENTE" ? "Mis reservas" : "Reservas"} description={role === "CLIENTE" ? "Consultá tus reservas y revisá sus detalles." : "Consultá las reservas y filtrá por cliente, vehículo o estado."}>
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
           <Select label="Cliente" value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value }))}>
             <option value="">Todos</option>{clients.map((client) => <option key={client.id} value={client.id}>{`${client.firstName} ${client.lastName}`}</option>)}
@@ -56,7 +56,7 @@ export function ReservationsPanel({
         </div>
       </SectionCard>
 
-      <SectionCard title="Listado de reservas" description="Cliente ve solo sus reservas. Admin ve todas.">
+      <SectionCard title="Detalle de reservas" description="Fechas, vehículo, importe y estado de cada reserva.">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Cliente</th><th>Vehiculo</th><th>Patente</th><th>Inicio</th><th>Fin</th><th>Precio diario</th><th>Importe total</th><th>Estado</th><th /></tr></thead>

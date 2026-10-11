@@ -20,7 +20,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
   return (
     <main className="auth-page">
-      <section className="auth-visual" aria-label="Vehículo disponible para alquilar">
+      <section className={`auth-visual ${isRegister ? "auth-visual-register" : ""}`} aria-label="Vehículo disponible para alquilar">
         <div className="auth-visual-top">
           <BrandMark />
           <span className="auth-location">BUENOS AIRES · ARG</span>

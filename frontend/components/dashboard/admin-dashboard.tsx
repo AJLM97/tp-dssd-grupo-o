@@ -61,8 +61,8 @@ export function AdminDashboard({
       {section === "VEHICULOS" ? (
         <div className="grid gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
           <SectionCard
-            title="Pantalla de ABM de Vehiculos"
-            description="Listado, formularios y baja logica para administrar la flota."
+            title="Gestionar vehículos"
+            description="Agregá un vehículo o actualizá sus datos."
           >
             <form className="grid gap-3" onSubmit={onVehicleSubmit}>
               <Input label="Patente *" value={vehicleForm.licensePlate} disabled={vehicleEditingId !== null} onChange={(event) => setVehicleForm((current) => ({ ...current, licensePlate: event.target.value }))} />
@@ -92,7 +92,7 @@ export function AdminDashboard({
             </form>
           </SectionCard>
 
-          <SectionCard title="Listado de vehiculos" description="Consulta y baja logica de la flota activa/inactiva.">
+          <SectionCard title="Flota de vehículos" description="Consultá y administrá los vehículos de Rentar.">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Patente</th><th>Marca/Modelo</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Activo</th><th /></tr></thead>
@@ -120,7 +120,7 @@ export function AdminDashboard({
 
       {section === "CLIENTES" ? (
         <div className="grid gap-5 lg:grid-cols-[420px_minmax(0,1fr)]">
-          <SectionCard title="Pantalla de ABM de Clientes" description="Listado, formularios y baja logica con documento y email unicos.">
+          <SectionCard title="Gestionar clientes" description="Agregá clientes o actualizá su información.">
             <form className="grid gap-3" onSubmit={onClientSubmit}>
               <Input label="Documento *" value={clientForm.document} onChange={(event) => setClientForm((current) => ({ ...current, document: event.target.value }))} />
               <Input label="Nombre *" value={clientForm.firstName} onChange={(event) => setClientForm((current) => ({ ...current, firstName: event.target.value }))} />
@@ -143,7 +143,7 @@ export function AdminDashboard({
             </form>
           </SectionCard>
 
-          <SectionCard title="Listado de clientes" description="Consulta y baja logica de clientes de Rentar.">
+          <SectionCard title="Clientes registrados" description="Consultá las cuentas y su estado.">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Documento</th><th>Cliente</th><th>Email</th><th>Activo</th><th /></tr></thead>
