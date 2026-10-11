@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rentar-Hito 1",
-
+  title: "Rentar | Alquiler de vehículos",
+  description: "Encontrá y administrá tu próximo vehículo con Rentar.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
