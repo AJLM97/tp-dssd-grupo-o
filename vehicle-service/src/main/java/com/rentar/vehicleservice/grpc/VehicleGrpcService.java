@@ -7,8 +7,11 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import com.rentar.vehicleservice.service.VehicleService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
+import java.util.function.Supplier;
 
 @GrpcService
 public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBase {
@@ -17,6 +20,25 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
 
     public VehicleGrpcService(VehicleService vehicleService) {
         this.vehicleService = vehicleService;
+    }
+
+    private static final Logger log = LoggerFactory.getLogger(VehicleGrpcService.class);
+
+    @Override
+    public void createVehicle(
+            CreateVehicleRequest request,
+            StreamObserver<VehicleResponse> responseObserver) {
+
+        respond(responseObserver, () -> toResponse(vehicleService.create(request)));
+    }
+
+    @Override
+    public void updateVehicle(
+            UpdateVehicleRequest request,
+            StreamObserver<VehicleResponse> responseObserver) {
+
+        respond(responseObserver,
+                () -> toResponse(vehicleService.update(request)));
     }
 
     @Override
@@ -99,5 +121,30 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
                 .setEstado(VehicleStatus.valueOf(vehicle.getEstado().name()))
                 .setTipo(VehicleType.valueOf(vehicle.getTipo().name()))
                 .build();
+    }
+
+    private <T> void respond(
+            StreamObserver<T> responseObserver,
+            Supplier<T> operation) {
+
+        T response;
+
+        try {
+            response = operation.get();
+        } catch (StatusRuntimeException exception) {
+            responseObserver.onError(exception);
+            return;
+        } catch (Exception exception) {
+            log.error("Error al procesar la solicitud de crear vehiculo", exception);
+
+            responseObserver.onError(
+                    Status.INTERNAL
+                            .withDescription("No se pudo procesar la solicitud de crear vehiculo")
+                            .asRuntimeException());
+            return;
+        }
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
     }
 }

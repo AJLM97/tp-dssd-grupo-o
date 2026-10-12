@@ -29,6 +29,7 @@ export type Client = {
   email: string;
   phone: string;
   birthDate: string;
+  password: string;
   active: boolean;
 };
 
@@ -41,6 +42,7 @@ export type Reservation = {
   dailyPrice: number;
   totalAmount: number;
   status: ReservationStatus;
+  vehicleType?: VehicleType;
 };
 
 export type VehicleForm = {
@@ -62,5 +64,6 @@ export type ClientForm = {
   email: string;
   phone: string;
   birthDate: string;
+  password: string;
   active: boolean;
 };

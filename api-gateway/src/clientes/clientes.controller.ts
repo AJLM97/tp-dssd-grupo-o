@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 
 import {
@@ -18,11 +19,13 @@ import {
 
 import { ClientesService } from './clientes.service';
 import { Cliente } from '../entities/cliente.entity';
+import { AuthGuard } from '@nestjs/passport';
+import { ClientePropioOAdminGuard } from '../auth/cliente-propio-o-admin.guard';
 
 @ApiTags('Clientes')
 @Controller('clientes')
 export class ClientesController {
-  constructor(private readonly clientesService: ClientesService) {}
+  constructor(private readonly clientesService: ClientesService) { }
 
   @Post()
   @ApiOperation({ summary: 'Alta de un nuevo cliente' })
@@ -103,6 +106,7 @@ export class ClientesController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard('jwt'), ClientePropioOAdminGuard)
   @ApiOperation({ summary: 'Modificar datos de un cliente' })
   @ApiBody({
     schema: {
@@ -157,6 +161,7 @@ export class ClientesController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'), ClientePropioOAdminGuard)
   @ApiOperation({ summary: 'Baja lógica de un cliente (activo = false)' })
   @ApiResponse({
     status: 200,

@@ -1,3 +1,4 @@
+import { RoleGuard } from "@/components/auth/role-guard";
 import DashboardWorkspace from "@/components/dashboard/dashboard-workspace";
 
 export const metadata = {
@@ -5,5 +6,9 @@ export const metadata = {
 };
 
 export default function CustomerPage() {
-  return <DashboardWorkspace role="CLIENTE" />;
+  return (
+    <RoleGuard role="CLIENTE">
+      <DashboardWorkspace role="CLIENTE" />
+    </RoleGuard>
+  );
 }

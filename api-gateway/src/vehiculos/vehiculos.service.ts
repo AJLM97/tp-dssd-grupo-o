@@ -1,153 +1,174 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Vehiculo } from '../entities/vehiculo.entity';
-import { EstadoReserva } from '../enums/estado-reserva.enum';
-import { TipoVehiculo } from '../enums/tipo-vehiculo.enum';
-import { EstadoVehiculo } from '../enums/estado-vehiculo.enum';
+import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { type ClientGrpc } from '@nestjs/microservices';
+import { Observable, lastValueFrom } from 'rxjs';
+import { ReservasService } from '../reservas/reservas.service';
 
-export interface FiltrosVehiculosDisponibles {
-  fechaInicio: Date;
-  fechaFin: Date;
-  tipo?: TipoVehiculo;
-  marca?: string;
-  modelo?: string;
-  precioDiarioMin?: number;
-  precioDiarioMax?: number;
+interface VehicleServiceGrpc {
+  createVehicle(data: any): Observable<any>;
+  updateVehicle(data: any): Observable<any>;
+  deleteVehicle(data: { id: number }): Observable<any>;
+  getVehicles(data: { solo_activos: boolean }): Observable<any>;
+  getVehicleById(data: { id: number }): Observable<any>;
+  checkAvailability(data: any): Observable<any>;
+  updateVehicleStatus(data: any): Observable<any>;
+  checkAvailability(data: {
+    vehicleId: number;
+    fechaInicio: string;
+    fechaFin: string;
+  }): Observable<{ disponible: boolean }>;
 }
 
 @Injectable()
-export class VehiculosService {
-  constructor(
-    @InjectRepository(Vehiculo)
-    private readonly vehiculosRepository: Repository<Vehiculo>,
-  ) {}
+export class VehiculosService implements OnModuleInit {
+  private vehicleGrpcService: VehicleServiceGrpc;
 
-  async crear(data: Partial<Vehiculo>): Promise<Vehiculo> {
-    const existe = await this.vehiculosRepository.findOne({ where: { patente: data.patente } });
-    if (existe) {
-      throw new BadRequestException('La patente ya se encuentra registrada');
-    }
-    const nuevo = this.vehiculosRepository.create({
-      ...data,
-      estado: EstadoVehiculo.DISPONIBLE,
-      activo: true,
-    });
-    return await this.vehiculosRepository.save(nuevo);
+  constructor(@Inject('VEHICLE_SERVICE') private readonly client: ClientGrpc, private readonly reservasService: ReservasService) { }
+
+  onModuleInit() {
+    this.vehicleGrpcService = this.client.getService<VehicleServiceGrpc>('VehicleService');
   }
 
-  async obtenerTodos(): Promise<Vehiculo[]> {
-    return await this.vehiculosRepository.find();
+  async crear(data: any) {
+    return await lastValueFrom(this.vehicleGrpcService.createVehicle(data));
   }
 
-  async obtenerPorId(id: number): Promise<Vehiculo> {
-    const vehiculo = await this.vehiculosRepository.findOne({ where: { id } });
-    if (!vehiculo) {
-      throw new NotFoundException('Vehículo no encontrado');
-    }
-    return vehiculo;
+  async obtenerTodos() {
+    const res = await lastValueFrom(this.vehicleGrpcService.getVehicles({ solo_activos: false }));
+    return res.vehicles || [];
   }
 
-  async actualizar(id: number, data: Partial<Vehiculo>): Promise<Vehiculo> {
-    const vehiculo = await this.obtenerPorId(id);
-    if (data.patente && data.patente !== vehiculo.patente) {
-      throw new BadRequestException('La patente no se puede modificar');
-    }
-    Object.assign(vehiculo, data);
-    return await this.vehiculosRepository.save(vehiculo);
+  async obtenerPorId(id: number) {
+    return await lastValueFrom(this.vehicleGrpcService.getVehicleById({ id }));
   }
 
-  async bajaLogica(id: number): Promise<Vehiculo> {
-    const vehiculo = await this.obtenerPorId(id);
-    vehiculo.activo = false;
-    return await this.vehiculosRepository.save(vehiculo);
+  async actualizar(id: number, data: any) {
+    return await lastValueFrom(this.vehicleGrpcService.updateVehicle({ id, ...data }));
   }
 
-  async buscarDisponibles(
-    filtros: FiltrosVehiculosDisponibles,
-  ): Promise<Vehiculo[]> {
-    this.validarFiltros(filtros);
-
-    const query = this.vehiculosRepository
-      .createQueryBuilder('vehiculo')
-      .leftJoin(
-        'vehiculo.reservas',
-        'reservaSuperpuesta',
-        `reservaSuperpuesta.estado != :estadoCancelada
-          AND reservaSuperpuesta.fechaInicio < :fechaFin
-          AND reservaSuperpuesta.fechaFin > :fechaInicio`,
-        {
-          estadoCancelada: EstadoReserva.CANCELADA,
-          fechaInicio: filtros.fechaInicio,
-          fechaFin: filtros.fechaFin,
-        },
-      )
-      .where('vehiculo.activo = :activo', { activo: true })
-      .andWhere('reservaSuperpuesta.id IS NULL');
-
-    if (filtros.tipo) {
-      query.andWhere('vehiculo.tipo = :tipo', { tipo: filtros.tipo });
-    }
-
-    const marca = filtros.marca?.trim();
-    if (marca) {
-      query.andWhere('LOWER(vehiculo.marca) LIKE :marca', {
-        marca: `%${marca.toLowerCase()}%`,
-      });
-    }
-
-    const modelo = filtros.modelo?.trim();
-    if (modelo) {
-      query.andWhere('LOWER(vehiculo.modelo) LIKE :modelo', {
-        modelo: `%${modelo.toLowerCase()}%`,
-      });
-    }
-
-    if (filtros.precioDiarioMin !== undefined) {
-      query.andWhere('vehiculo.precioDiario >= :precioDiarioMin', {
-        precioDiarioMin: filtros.precioDiarioMin,
-      });
-    }
-
-    if (filtros.precioDiarioMax !== undefined) {
-      query.andWhere('vehiculo.precioDiario <= :precioDiarioMax', {
-        precioDiarioMax: filtros.precioDiarioMax,
-      });
-    }
-
-    return query
-      .orderBy('vehiculo.marca', 'ASC')
-      .addOrderBy('vehiculo.modelo', 'ASC')
-      .getMany();
+  async bajaLogica(id: number) {
+    return await lastValueFrom(this.vehicleGrpcService.deleteVehicle({ id }));
   }
 
-  private validarFiltros(filtros: FiltrosVehiculosDisponibles): void {
-    if (filtros.fechaFin <= filtros.fechaInicio) {
-      throw new BadRequestException(
-        'La fecha de finalización debe ser posterior a la fecha de inicio.',
-      );
-    }
-
-    if (filtros.precioDiarioMin !== undefined && filtros.precioDiarioMin < 0) {
-      throw new BadRequestException(
-        'El precio diario mínimo no puede ser negativo.',
-      );
-    }
-
-    if (filtros.precioDiarioMax !== undefined && filtros.precioDiarioMax < 0) {
-      throw new BadRequestException(
-        'El precio diario máximo no puede ser negativo.',
-      );
-    }
+  async buscarDisponibles(filtros: any) {
+    const fechaInicio = new Date(filtros.fechaInicio).getTime();
+    const fechaFin = new Date(filtros.fechaFin).getTime();
 
     if (
-      filtros.precioDiarioMin !== undefined &&
-      filtros.precioDiarioMax !== undefined &&
-      filtros.precioDiarioMax < filtros.precioDiarioMin
+      !Number.isFinite(fechaInicio) ||
+      !Number.isFinite(fechaFin) ||
+      fechaFin <= fechaInicio
     ) {
-      throw new BadRequestException(
-        'El precio diario máximo debe ser mayor o igual al mínimo.',
-      );
+      throw new Error('El período solicitado no es válido.');
     }
+
+    const [respuestaVehiculos, reservas] = await Promise.all([
+      lastValueFrom(
+        this.vehicleGrpcService.getVehicles({ solo_activos: true }),
+      ),
+      this.reservasService.buscar({}),
+    ]);
+
+    const vehiculos = respuestaVehiculos.vehicles || [];
+
+    const tiposVehiculo: Record<number, string> = {
+      1: 'SEDAN',
+      2: 'SUV',
+      3: 'PICKUP',
+      4: 'COUPE',
+      5: 'HATCHBACK',
+    };
+
+    return vehiculos.flatMap((vehiculo: any) => {
+      const vehiculoId = Number(vehiculo.id);
+
+      const ocupado = reservas.some((reserva: any) => {
+        const estado =
+          typeof reserva.estado === 'string'
+            ? reserva.estado.toUpperCase()
+            : ({
+              1: 'CONFIRMADA',
+              2: 'EN_CURSO',
+              3: 'FINALIZADA',
+              4: 'CANCELADA',
+            } as Record<number, string>)[Number(reserva.estado)];
+
+        if (estado !== 'CONFIRMADA' && estado !== 'EN_CURSO') {
+          return false;
+        }
+
+        const reservaVehiculoId = Number(
+          reserva.vehicleId ?? reserva.vehicle_id,
+        );
+        const inicioReserva = new Date(
+          reserva.fechaInicio ?? reserva.fecha_inicio,
+        ).getTime();
+        const finReserva = new Date(
+          reserva.fechaFin ?? reserva.fecha_fin,
+        ).getTime();
+
+        return (
+          reservaVehiculoId === vehiculoId &&
+          inicioReserva < fechaFin &&
+          finReserva > fechaInicio
+        );
+      });
+
+      if (ocupado) {
+        return [];
+      }
+
+      const precioDiario = Number(vehiculo.precioDiario);
+      const tipo =
+        typeof vehiculo.tipo === 'number'
+          ? tiposVehiculo[vehiculo.tipo]
+          : vehiculo.tipo;
+
+      if (!tipo) {
+        throw new Error(`Tipo de vehículo gRPC desconocido: ${vehiculo.tipo}`);
+      }
+
+      if (filtros.tipo && tipo !== filtros.tipo) return [];
+      if (
+        filtros.marca &&
+        !String(vehiculo.marca)
+          .toLowerCase()
+          .includes(filtros.marca.toLowerCase())
+      ) {
+        return [];
+      }
+      if (
+        filtros.modelo &&
+        !String(vehiculo.modelo)
+          .toLowerCase()
+          .includes(filtros.modelo.toLowerCase())
+      ) {
+        return [];
+      }
+      if (
+        filtros.precioDiarioMin != null &&
+        precioDiario < filtros.precioDiarioMin
+      ) {
+        return [];
+      }
+      if (
+        filtros.precioDiarioMax != null &&
+        precioDiario > filtros.precioDiarioMax
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          id: vehiculoId,
+          patente: vehiculo.patente,
+          marca: vehiculo.marca,
+          modelo: vehiculo.modelo,
+          anio: Number(vehiculo.anio),
+          color: vehiculo.color,
+          tipo,
+          precioDiario,
+        },
+      ];
+    });
   }
 }

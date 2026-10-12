@@ -29,6 +29,7 @@ import {
 import {
   fetchVehiculos,
   saveVehiculo,
+  crearVehiculo,
   deleteVehiculoApi,
   fetchClientes,
   saveCliente,
@@ -45,6 +46,7 @@ import type {
   Vehicle,
   VehicleForm,
 } from "@/lib/rentar-types";
+import { OwnReservationsPanel } from "./own-reservations-panel";
 
 const SECTION_LABELS: Record<UiSection, string> = {
   VEHICULOS: "Flota",
@@ -55,13 +57,42 @@ const SECTION_LABELS: Record<UiSection, string> = {
   HISTORIAL: "Mi historial",
 };
 
+function normalizarId(id: unknown): number {
+  let resultado: number;
+
+  if (typeof id === "number" || typeof id === "string") {
+    resultado = Number(id);
+  } else if (
+    id !== null &&
+    typeof id === "object" &&
+    "low" in id &&
+    "high" in id
+  ) {
+    const valor = id as { low: number; high: number };
+    resultado = valor.high * 0x100000000 + (valor.low >>> 0);
+  } else {
+    throw new Error("El backend devolvió un ID con formato inválido.");
+  }
+
+  if (!Number.isSafeInteger(resultado) || resultado <= 0) {
+    throw new Error("El backend devolvió un ID inválido.");
+  }
+
+  return resultado;
+}
+
 export default function DashboardWorkspace({ role }: { role: AppRole }) {
   const isLoggingOut = useRef(false);
   const [section, setSection] = useState<UiSection>(role === "ADMIN" ? "VEHICULOS" : "DISPONIBILIDAD");
 
   useEffect(() => {
     if (isLoggingOut.current) return;
-    localStorage.setItem("activeUserId", role === "ADMIN" ? "1" : "2");
+
+    const sesionGuardada = localStorage.getItem("rentar-session");
+    if (!sesionGuardada) return;
+
+    const sesion = JSON.parse(sesionGuardada) as { user: { id: number } };
+    localStorage.setItem("activeUserId", String(sesion.user.id));
   }, [role]);
 
   const reloadData = async () => {
@@ -72,7 +103,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       ]);
 
       const mappedVehicles = vehData.map((v: any) => ({
-        id: v.id,
+        id: normalizarId(v.id),
         licensePlate: v.patente || v.licensePlate,
         brand: v.marca || v.brand,
         model: v.modelo || v.model,
@@ -85,7 +116,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       }));
 
       const mappedClients = cliData.map((c: any) => ({
-        id: c.id,
+        id: normalizarId(c.id),
         document: c.documento || c.document,
         firstName: c.nombre || c.firstName,
         lastName: c.apellido || c.lastName,
@@ -136,7 +167,6 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
     const endFilter = normalizeDate(reservationFilters.endAt);
 
     return reservations.filter((reservation) => {
-      const vehicle = vehicles.find((item) => item.id === reservation.vehicleId);
 
       if (role === "CLIENTE" && reservation.clientId !== currentClientId) {
         return false;
@@ -150,7 +180,10 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
         return false;
       }
 
-      if (reservationFilters.vehicleType && vehicle?.type !== reservationFilters.vehicleType) {
+      if (
+        reservationFilters.vehicleType &&
+        reservation.vehicleType !== reservationFilters.vehicleType
+      ) {
         return false;
       }
 
@@ -221,13 +254,33 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       if (section !== "RESERVAS") return;
 
       try {
+        const sesionGuardada = localStorage.getItem("rentar-session");
+        const sesion = sesionGuardada
+          ? (JSON.parse(sesionGuardada) as { user?: { id?: number } })
+          : null;
+
+        const clienteId =
+          role === "CLIENTE"
+            ? sesion?.user?.id
+            : reservationFilters.clientId
+              ? Number(reservationFilters.clientId)
+              : undefined;
+
+        if (role === "CLIENTE" && !clienteId) {
+          throw new Error("La sesión no contiene un ID de cliente válido.");
+        }
+
         const response = await apolloClient.query({
           query: QUERY_RESERVAS,
           variables: {
             filtros: {
-              clienteId: reservationFilters.clientId ? Number(reservationFilters.clientId) : undefined,
+              clienteId:
+                role === "CLIENTE"
+                  ? clienteId
+                  : reservationFilters.clientId
+                    ? Number(reservationFilters.clientId)
+                    : undefined,
               vehiculoId: reservationFilters.vehicleId ? Number(reservationFilters.vehicleId) : undefined,
-              tipoVehiculo: reservationFilters.vehicleType || undefined,
               estado: reservationFilters.status || undefined,
               fechaInicio: reservationFilters.startAt ? new Date(reservationFilters.startAt).toISOString() : undefined,
               fechaFin: reservationFilters.endAt ? new Date(reservationFilters.endAt).toISOString() : undefined,
@@ -242,6 +295,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
           id: r.id,
           clientId: r.cliente?.id,
           vehicleId: r.vehiculo?.id,
+          vehicleType: r.vehiculo?.tipo,
           startAt: r.fechaInicio,
           endAt: r.fechaFin,
           dailyPrice: Number(r.precioDiario),
@@ -312,7 +366,33 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
         activo: vehicleForm.active,
       };
 
-      await saveVehiculo(payload, vehicleEditingId !== null, vehicleEditingId ?? undefined);
+      const sesionGuardada = localStorage.getItem("rentar-session");
+      const sesion = sesionGuardada
+        ? (JSON.parse(sesionGuardada) as { access_token?: string })
+        : null;
+      const accessToken = sesion?.access_token;
+
+      if (!accessToken) {
+        setFeedback("No se encontró el token de sesión. Iniciá sesión nuevamente.");
+        return;
+      }
+
+      if (vehicleEditingId !== null) {
+        await saveVehiculo(payload, true, vehicleEditingId, accessToken);
+      } else {
+        await crearVehiculo(
+          {
+            patente: payload.patente,
+            marca: payload.marca,
+            modelo: payload.modelo,
+            anio: payload.anio,
+            color: payload.color,
+            tipo: payload.tipo,
+            precioDiario: payload.precioDiario,
+          },
+          accessToken,
+        );
+      }
       await reloadData();
       clearVehicleForm();
       setFeedback(vehicleEditingId ? "Vehículo actualizado en el backend." : "Vehículo añadido correctamente.");
@@ -331,17 +411,36 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
     }
 
     try {
+      const sesionGuardada = localStorage.getItem("rentar-session");
+      const sesion = sesionGuardada
+        ? (JSON.parse(sesionGuardada) as { access_token?: string })
+        : null;
+      const accessToken = sesion?.access_token;
+
+      if (!accessToken) {
+        setFeedback("No se encontró el token de sesión. Iniciá sesión nuevamente.");
+        return;
+      }
+
       const payload = {
         documento: clientForm.document.trim(),
         nombre: clientForm.firstName.trim(),
         apellido: clientForm.lastName.trim(),
         email: clientForm.email.trim().toLowerCase(),
+        ...(clientEditingId === null
+          ? { password: clientForm.password }
+          : {}),
         telefono: clientForm.phone.trim(),
         fechaNacimiento: clientForm.birthDate,
         activo: clientForm.active,
       };
 
-      await saveCliente(payload, clientEditingId !== null, clientEditingId ?? undefined);
+      await saveCliente(
+        payload,
+        clientEditingId !== null,
+        clientEditingId ?? undefined,
+        accessToken,
+      );
       await reloadData();
       clearClientForm();
       setFeedback(clientEditingId ? "Cliente actualizado en el backend." : "Cliente añadido correctamente.");
@@ -395,6 +494,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       email: client.email,
       phone: client.phone,
       birthDate: client.birthDate,
+      password: "",
       active: client.active,
     });
     setSection("CLIENTES");
@@ -403,17 +503,36 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
   async function handleCreateReservation() {
     setFeedback("");
 
-    if (!currentClient || !selectedVehicleId || !reservationStartAt || !reservationEndAt) {
-      setFeedback("Completa cliente, vehículo y rango de fechas.");
+    const sesionGuardada = localStorage.getItem("rentar-session");
+    const sesion = sesionGuardada
+      ? (JSON.parse(sesionGuardada) as { user?: { id?: number } })
+      : null;
+
+    const clienteId = role === "CLIENTE" ? sesion?.user?.id : currentClient?.id;
+
+    const vehiculoSeleccionado = vehicles.find(
+      (vehiculo) => vehiculo.id === selectedVehicleId,
+    );
+
+    if (
+      clienteId === undefined ||
+      clienteId <= 0 ||
+      !vehiculoSeleccionado ||
+      vehiculoSeleccionado.dailyPrice <= 0 ||
+      !reservationStartAt ||
+      !reservationEndAt
+    ) {
+      setFeedback("Completa cliente, vehículo con precio válido y rango de fechas.");
       return;
     }
 
     try {
       await postReserva({
-        clienteId: currentClient.id,
-        vehiculoId: selectedVehicleId,
-        fechaInicio: new Date(reservationStartAt).toISOString(),
-        fechaFin: new Date(reservationEndAt).toISOString(),
+        clienteId,
+        vehiculoId: vehiculoSeleccionado.id,
+        precioDiario: vehiculoSeleccionado.dailyPrice,
+        fechaInicio: reservationStartAt,
+        fechaFin: reservationEndAt,
       });
 
       await reloadData();
@@ -431,6 +550,9 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
 
     try {
       await putCancelarReserva(reservationId);
+      setReservations((actuales) =>
+        actuales.filter((reserva) => reserva.id !== reservationId),
+      );
       await reloadData();
       setFeedback("Reserva cancelada en el backend.");
     } catch (err: any) {
@@ -450,7 +572,17 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
 
         const data = response.data as { historialCliente: any[] };
 
-        setHistoryRows(data.historialCliente);
+        setHistoryRows(
+          data.historialCliente.map((reserva: any) => ({
+            id: normalizarId(reserva.id),
+            vehicleId: reserva.vehiculo?.id ? normalizarId(reserva.vehiculo.id) : 0,
+            startAt: reserva.fechaInicio,
+            endAt: reserva.fechaFin,
+            dailyPrice: Number(reserva.precioDiario ?? 0),
+            totalAmount: Number(reserva.importeTotal),
+            status: reserva.estado,
+          })),
+        );
       } catch (err: any) {
         console.error("Error al consultar historial vía GraphQL:", err.message);
       }
@@ -462,6 +594,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
   function handleLogout() {
     isLoggingOut.current = true;
     localStorage.removeItem("activeUserId");
+    localStorage.removeItem("rentar-session");
   }
 
   return (
@@ -492,7 +625,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
               key={item}
               type="button"
               onClick={() => setSection(item)}
-              className={`rentar-nav-button rounded-md px-3 py-2 text-sm font-medium ${section === item ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 hover:bg-zinc-200"}`}
+              className={`cursor-pointer rentar-nav-button rounded-md px-3 py-2 text-sm font-medium ${section === item ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 hover:bg-zinc-200"}`}
             >
               {SECTION_LABELS[item]}
             </button>
@@ -502,16 +635,24 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
         {feedback ? <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-800">{feedback}</div> : null}
 
         {section === "RESERVAS" ? (
-          <ReservationsPanel
-            role={role}
-            currentClientId={currentClientId}
-            clients={clients}
-            vehicles={vehicles}
-            reservations={filteredReservations}
-            filters={reservationFilters}
-            setFilters={setReservationFilters}
-            onCancelReservation={handleCancelReservation}
-          />
+          role === "ADMIN" ? (
+            <ReservationsPanel
+              role={role}
+              currentClientId={currentClientId}
+              clients={clients}
+              vehicles={vehicles}
+              reservations={filteredReservations}
+              filters={reservationFilters}
+              setFilters={setReservationFilters}
+              onCancelReservation={handleCancelReservation}
+            />
+          ) : (
+            <OwnReservationsPanel
+              reservations={reservations}
+              vehicles={vehicles}
+              onCancelReservation={handleCancelReservation}
+            />
+          )
         ) : role === "ADMIN" ? (
           <AdminDashboard
             section={section}

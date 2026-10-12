@@ -85,7 +85,7 @@ export function AdminDashboard({
                 <button type="submit" className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
                   {vehicleEditingId ? "Guardar cambios" : "Anadir vehiculo"}
                 </button>
-                <button type="button" onClick={onClearVehicleForm} className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium">
+                <button type="button" onClick={onClearVehicleForm} className="cursor-pointer rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium">
                   Eliminar carga
                 </button>
               </div>
@@ -126,6 +126,15 @@ export function AdminDashboard({
               <Input label="Nombre *" value={clientForm.firstName} onChange={(event) => setClientForm((current) => ({ ...current, firstName: event.target.value }))} />
               <Input label="Apellido *" value={clientForm.lastName} onChange={(event) => setClientForm((current) => ({ ...current, lastName: event.target.value }))} />
               <Input label="Email *" type="email" value={clientForm.email} onChange={(event) => setClientForm((current) => ({ ...current, email: event.target.value }))} />
+              <Input
+                label={clientEditingId ? "Contraseña (solo para alta)" : "Contraseña *"}
+                type="password"
+                required={clientEditingId === null}
+                value={clientForm.password}
+                onChange={(event) =>
+                  setClientForm((current) => ({ ...current, password: event.target.value }))
+                }
+              />
               <Input label="Telefono" value={clientForm.phone} onChange={(event) => setClientForm((current) => ({ ...current, phone: event.target.value }))} />
               <Input label="Fecha de nacimiento" type="date" value={clientForm.birthDate} onChange={(event) => setClientForm((current) => ({ ...current, birthDate: event.target.value }))} />
               <label className="flex items-center gap-2 text-sm">
@@ -136,7 +145,7 @@ export function AdminDashboard({
                 <button type="submit" className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
                   {clientEditingId ? "Guardar cambios" : "Anadir cliente"}
                 </button>
-                <button type="button" onClick={onClearClientForm} className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium">
+                <button type="button" onClick={onClearClientForm} className="cursor-pointer rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium">
                   Eliminar carga
                 </button>
               </div>

@@ -1,299 +1,132 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Reserva } from '../entities/reserva.entity';
-import { Usuario } from '../entities/usuario.entity';
-import { Vehiculo } from '../entities/vehiculo.entity';
-import { EstadoReserva } from '../enums/estado-reserva.enum';
-import { RolUsuario } from '../enums/rol-usuario.enum';
-import { TipoVehiculo } from '../enums/tipo-vehiculo.enum';
-import { Cliente } from '../entities/cliente.entity';
+import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { type ClientGrpc } from '@nestjs/microservices';
+import { Observable, lastValueFrom } from 'rxjs';
 
-export interface FiltrosReservas {
-  clienteId?: number;
-  vehiculoId?: number;
-  tipoVehiculo?: TipoVehiculo;
-  estado?: EstadoReserva;
-  fechaInicio?: Date;
-  fechaFin?: Date;
+interface RentalServiceGrpc {
+  createRental(data: any): Observable<any>;
+  getRentals(data: any): Observable<any>;
+  cancelRental(data: any): Observable<any>;
+  getRentalHistory(data: any): Observable<any>;
 }
 
-export interface HistorialClienteItem {
-  id: number;
-  vehiculo: Vehiculo;
-  fechaInicio: Date;
-  fechaFin: Date;
-  cantidadDias: number;
-  importeTotal: number;
-  estado: EstadoReserva;
+interface VehicleServiceGrpc {
+  getVehicles(data: { solo_activos: boolean }): Observable<{
+    vehicles: Array<{
+      id: number | string;
+      tipo: number | string;
+    }>;
+  }>;
 }
 
 @Injectable()
-export class ReservasService {
-  constructor(
-    @InjectRepository(Reserva)
-    private readonly reservasRepository: Repository<Reserva>,
-    @InjectRepository(Cliente)
-    private readonly clientesRepository: Repository<Cliente>,
-    @InjectRepository(Vehiculo)
-    private readonly vehiculosRepository: Repository<Vehiculo>,
-  ) {}
+export class ReservasService implements OnModuleInit {
+  private rentalGrpcService: RentalServiceGrpc;
+  private vehicleGrpcService: VehicleServiceGrpc;
 
-  async crearReserva(data: {
-    clienteId: number;
-    vehiculoId: number;
-    fechaInicio: string | Date;
-    fechaFin: string | Date;
-  }): Promise<Reserva> {
-    const inicio = new Date(data.fechaInicio);
-    const fin = new Date(data.fechaFin);
-    const ahora = new Date();
+  constructor(@Inject('RENTAL_SERVICE') private readonly client: ClientGrpc, @Inject('VEHICLE_SERVICE') private readonly vehicleClient: ClientGrpc) { }
 
-    if (inicio <= ahora) {
-      throw new BadRequestException('La fecha de inicio debe ser futura.');
-    }
-
-    if (fin <= inicio) {
-      throw new BadRequestException(
-        'La fecha de finalización debe ser posterior a la fecha de inicio.',
-      );
-    }
-
-    const cliente = await this.clientesRepository.findOne({
-      where: { id: data.clienteId },
-    });
-    if (!cliente) {
-      throw new NotFoundException('El cliente no existe.');
-    }
-    if (!cliente.activo) {
-      throw new BadRequestException('El cliente se encuentra inactivo.');
-    }
-
-    const vehiculo = await this.vehiculosRepository.findOne({
-      where: { id: data.vehiculoId },
-    });
-    if (!vehiculo) {
-      throw new NotFoundException('El vehículo no existe.');
-    }
-    if (!vehiculo.activo) {
-      throw new BadRequestException('El vehículo se encuentra inactivo.');
-    }
-
-    // Regla de no superposición de fechas
-    const solapamiento = await this.reservasRepository
-      .createQueryBuilder('reserva')
-      .innerJoin('reserva.vehiculo', 'vehiculo')
-      .where('vehiculo.id = :vehiculoId', { vehiculoId: vehiculo.id })
-      .andWhere('reserva.estado = :estado', {
-        estado: EstadoReserva.CONFIRMADA,
-      })
-      .andWhere('reserva.fechaInicio < :fin AND reserva.fechaFin > :inicio', {
-        inicio,
-        fin,
-      })
-      .getOne();
-
-    if (solapamiento) {
-      throw new BadRequestException(
-        'El vehículo no se encuentra disponible en el período solicitado.',
-      );
-    }
-
-    const cantidadDias = this.calcularCantidadDias(inicio, fin);
-    const importeTotal = cantidadDias * Number(vehiculo.precioDiario);
-
-    const nuevaReserva = this.reservasRepository.create({
-      cliente,
-      vehiculo,
-      fechaInicio: inicio,
-      fechaFin: fin,
-      precioDiario: vehiculo.precioDiario,
-      importeTotal,
-      estado: EstadoReserva.CONFIRMADA,
-    });
-
-    return await this.reservasRepository.save(nuevaReserva);
+  onModuleInit() {
+    this.rentalGrpcService = this.client.getService<RentalServiceGrpc>('RentalService');
+    this.vehicleGrpcService = this.vehicleClient.getService<VehicleServiceGrpc>('VehicleService');
   }
 
-  async cancelarReserva(id: number): Promise<Reserva> {
-    const reserva = await this.reservasRepository.findOne({ where: { id } });
-    if (!reserva) {
-      throw new NotFoundException('La reserva no existe.');
-    }
-
-    const ahora = new Date();
-    if (new Date(reserva.fechaInicio) <= ahora) {
-      throw new BadRequestException(
-        'No se puede cancelar una reserva cuyo período ya ha comenzado.',
-      );
-    }
-
-    reserva.estado = EstadoReserva.CANCELADA;
-    return await this.reservasRepository.save(reserva);
-  }
-
-  buscar(filtros: FiltrosReservas, usuarioActual: Usuario): Promise<Reserva[]> {
-    this.validarFiltros(filtros);
-
-    const query = this.reservasRepository
-      .createQueryBuilder('reserva')
-      .innerJoinAndSelect('reserva.cliente', 'cliente')
-      .innerJoinAndSelect('reserva.vehiculo', 'vehiculo');
-
-    if (usuarioActual.rol === RolUsuario.CLIENTE) {
-      if (!usuarioActual.cliente) {
-        throw new ForbiddenException(
-          'El usuario cliente no tiene un cliente asociado.',
-        );
-      }
-
-      if (
-        filtros.clienteId !== undefined &&
-        filtros.clienteId !== usuarioActual.cliente.id
-      ) {
-        throw new ForbiddenException(
-          'Un cliente no puede consultar reservas de otro cliente.',
-        );
-      }
-
-      query.andWhere('cliente.id = :clienteActualId', {
-        clienteActualId: usuarioActual.cliente.id,
-      });
-    } else if (usuarioActual.rol === RolUsuario.ADMIN) {
-      if (filtros.clienteId !== undefined) {
-        query.andWhere('cliente.id = :clienteId', {
-          clienteId: filtros.clienteId,
-        });
-      }
-    } else {
-      throw new ForbiddenException('El usuario no posee un rol habilitado.');
-    }
-
-    if (filtros.vehiculoId !== undefined) {
-      query.andWhere('vehiculo.id = :vehiculoId', {
-        vehiculoId: filtros.vehiculoId,
-      });
-    }
-
-    if (filtros.tipoVehiculo) {
-      query.andWhere('vehiculo.tipo = :tipoVehiculo', {
-        tipoVehiculo: filtros.tipoVehiculo,
-      });
-    }
-
-    if (filtros.estado) {
-      query.andWhere('reserva.estado = :estado', { estado: filtros.estado });
-    }
-
-    if (filtros.fechaInicio && filtros.fechaFin) {
-      query
-        .andWhere('reserva.fechaInicio < :fechaFin', {
-          fechaFin: filtros.fechaFin,
-        })
-        .andWhere('reserva.fechaFin > :fechaInicio', {
-          fechaInicio: filtros.fechaInicio,
-        });
-    }
-
-    return query.orderBy('reserva.fechaInicio', 'DESC').getMany();
-  }
-
-  async buscarHistorialCliente(
-    usuarioActual: Usuario,
-  ): Promise<HistorialClienteItem[]> {
-    if (usuarioActual.rol !== RolUsuario.CLIENTE) {
-      throw new ForbiddenException(
-        'El historial de alquileres está disponible únicamente para clientes.',
-      );
-    }
-
-    if (!usuarioActual.cliente) {
-      throw new ForbiddenException(
-        'El usuario cliente no tiene un cliente asociado.',
-      );
-    }
-
-    const ahora = new Date();
-    const reservas = await this.reservasRepository
-      .createQueryBuilder('reserva')
-      .innerJoinAndSelect('reserva.vehiculo', 'vehiculo')
-      .innerJoin('reserva.cliente', 'cliente')
-      .where('cliente.id = :clienteId', {
-        clienteId: usuarioActual.cliente.id,
-      })
-      .andWhere(
-        `(
-          reserva.estado IN (:...estadosHistorial)
-          OR (
-            reserva.estado IN (:...estadosActivos)
-            AND reserva.fechaFin < :ahora
-          )
-        )`,
-        {
-          estadosHistorial: [EstadoReserva.FINALIZADA, EstadoReserva.CANCELADA],
-          estadosActivos: [EstadoReserva.CONFIRMADA, EstadoReserva.EN_CURSO],
-          ahora,
-        },
-      )
-      .orderBy('reserva.fechaInicio', 'DESC')
-      .getMany();
-
-    return reservas.map((reserva) => ({
-      id: reserva.id,
-      vehiculo: reserva.vehiculo,
-      fechaInicio: reserva.fechaInicio,
-      fechaFin: reserva.fechaFin,
-      cantidadDias: this.calcularCantidadDias(
-        reserva.fechaInicio,
-        reserva.fechaFin,
-      ),
-      importeTotal: reserva.importeTotal,
-      estado:
-        reserva.estado === EstadoReserva.CANCELADA
-          ? EstadoReserva.CANCELADA
-          : EstadoReserva.FINALIZADA,
+  async crearReserva(data: any) {
+    return await lastValueFrom(this.rentalGrpcService.createRental({
+      customerId: data.clienteId,
+      vehicleId: data.vehiculoId,
+      fechaInicio: data.fechaInicio,
+      fechaFin: data.fechaFin,
+      precioDiario: data.precioDiario || 0,
     }));
   }
 
-  private validarFiltros(filtros: FiltrosReservas): void {
-    for (const [nombre, valor] of [
-      ['clienteId', filtros.clienteId],
-      ['vehiculoId', filtros.vehiculoId],
-    ] as const) {
-      if (valor !== undefined && valor <= 0) {
-        throw new BadRequestException(`${nombre} debe ser mayor que cero.`);
-      }
-    }
-
-    const tieneInicio = filtros.fechaInicio !== undefined;
-    const tieneFin = filtros.fechaFin !== undefined;
-
-    if (tieneInicio !== tieneFin) {
-      throw new BadRequestException(
-        'El rango requiere fechaInicio y fechaFin.',
-      );
-    }
-
-    if (
-      filtros.fechaInicio &&
-      filtros.fechaFin &&
-      filtros.fechaFin <= filtros.fechaInicio
-    ) {
-      throw new BadRequestException(
-        'La fecha de finalización debe ser posterior a la fecha de inicio.',
-      );
-    }
+  async cancelarReserva(id: number) {
+    return await lastValueFrom(this.rentalGrpcService.cancelRental({
+      rentalId: id,
+      customerId: 0,
+    }));
   }
 
-  private calcularCantidadDias(fechaInicio: Date, fechaFin: Date): number {
-    const milisegundosPorDia = 1000 * 60 * 60 * 24;
-    const duracion = fechaFin.getTime() - fechaInicio.getTime();
+  async buscar(filtros: any) {
+    const [respuestaReservas, respuestaVehiculos] = await Promise.all([
+      lastValueFrom(
+        this.rentalGrpcService.getRentals({
+          customerId: filtros.clienteId || 0,
+          vehicleId: filtros.vehiculoId || 0,
+        }),
+      ),
+      lastValueFrom(
+        this.vehicleGrpcService.getVehicles({ solo_activos: false }),
+      ),
+    ]);
 
-    return Math.max(1, Math.ceil(duracion / milisegundosPorDia));
+    const reservas = respuestaReservas.rentals || [];
+    const tiposPorNumero: Record<number, string> = {
+      1: 'SEDAN',
+      2: 'SUV',
+      3: 'PICKUP',
+      4: 'COUPE',
+      5: 'HATCHBACK',
+    };
+
+    const normalizarTipo = (valor: number | string): string => {
+      const texto = String(valor).trim().toUpperCase();
+
+      if (/^\d+$/.test(texto)) {
+        const tipo = tiposPorNumero[Number(texto)];
+        if (!tipo) {
+          throw new Error(`Tipo de vehículo gRPC desconocido: ${texto}`);
+        }
+        return tipo;
+      }
+
+      return texto;
+    };
+
+    const vehiculosPorId = new Map(
+      (respuestaVehiculos.vehicles || []).map((vehiculo: any) => [
+        Number(vehiculo.id),
+        {
+          ...vehiculo,
+          tipo: normalizarTipo(vehiculo.tipo),
+        },
+      ]),
+    );
+
+    const enriquecidas = reservas.map((reserva: any) => {
+      const vehiculoId = Number(reserva.vehicleId ?? reserva.vehicle_id);
+      const vehiculo = vehiculosPorId.get(vehiculoId);
+
+      if (!vehiculo) {
+        throw new Error(
+          `No se encontró el vehículo ${vehiculoId} asociado a la reserva ${reserva.id}`,
+        );
+      }
+
+      return {
+        ...reserva,
+        vehiculo,
+      };
+    });
+
+    if (!filtros.tipoVehiculo) {
+      return enriquecidas;
+    }
+
+    const tipoSolicitado = normalizarTipo(filtros.tipoVehiculo);
+
+    return enriquecidas.filter(
+      (reserva: any) => reserva.vehiculo.tipo === tipoSolicitado,
+    );
+  }
+
+  async buscarHistorialCliente(clienteId: number) {
+    const res = await lastValueFrom(
+      this.rentalGrpcService.getRentalHistory({
+        customerId: clienteId,
+      }),
+    );
+
+    return res.rentals || [];
   }
 }

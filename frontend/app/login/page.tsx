@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { AuthScreen } from "@/components/auth/auth-screen";
+import { LoginScreen } from "@/components/auth/login-screen";
 
 export const metadata: Metadata = {
   title: "Iniciar sesión | Rentar",
 };
 
 export default function LoginPage() {
-  return <AuthScreen mode="login" />;
+  return <LoginScreen />;
 }

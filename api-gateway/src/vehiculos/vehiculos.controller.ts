@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 
 import {
@@ -19,12 +20,19 @@ import {
 import { VehiculosService } from './vehiculos.service';
 import { Vehiculo } from '../entities/vehiculo.entity';
 
+import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { RolUsuario } from '../enums/rol-usuario.enum';
+
 @ApiTags('Vehículos')
 @Controller('vehiculos')
 export class VehiculosController {
-  constructor(private readonly vehiculosService: VehiculosService) {}
+  constructor(private readonly vehiculosService: VehiculosService) { }
 
   @Post()
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RolUsuario.ADMIN)
   @ApiOperation({
     summary: 'Alta de un nuevo vehículo (queda en estado DISPONIBLE)',
   })
@@ -115,6 +123,8 @@ export class VehiculosController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RolUsuario.ADMIN)
   @ApiOperation({
     summary: 'Modificar datos de un vehículo (patente no modificable)',
   })
@@ -174,6 +184,8 @@ export class VehiculosController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RolUsuario.ADMIN)
   @ApiOperation({ summary: 'Baja lógica de un vehículo (activo = false)' })
   @ApiResponse({
     status: 200,

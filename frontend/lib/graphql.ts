@@ -1,7 +1,7 @@
 import { gql } from "@apollo/client";
 
 export const QUERY_VEHICULOS_DISPONIBLES = gql`
-  query VehiculosDisponibles($filtros: FiltrosVehiculosDisponiblesInput!) {
+  query VehiculosDisponibles($filtros: VehiculosDisponiblesInput!) {
     vehiculosDisponibles(filtros: $filtros) {
       id
       patente
@@ -11,8 +11,6 @@ export const QUERY_VEHICULOS_DISPONIBLES = gql`
       color
       tipo
       precioDiario
-      estado
-      activo
     }
   }
 `;
@@ -56,7 +54,6 @@ export const QUERY_HISTORIAL_CLIENTE = gql`
         patente
         marca
         modelo
-        tipo
       }
     }
   }

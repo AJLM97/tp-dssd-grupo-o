@@ -60,11 +60,13 @@ type Query {
   estadoGraphql: String!
 
   """
-  Devuelve los alquileres finalizados y las reservas canceladas del cliente actual.
+  Devuelve los alquileres finalizados y cancelados del cliente autenticado vía gRPC.
   """
   historialCliente: [HistorialClienteResultado!]!
 
-  """Consulta reservas aplicando filtros y el acceso del usuario actual."""
+  """
+  Consulta reservas aplicando filtros a través de gRPC con Rental Service.
+  """
   reservas(filtros: ReservasInput): [ReservaResultado!]!
 
   """
@@ -120,8 +122,8 @@ input ReservasInput {
   """
   fechaInicio: DateTime
 
-  """Filtra por la categoría del vehículo reservado."""
-  tipoVehiculo: TipoVehiculo
+  """Categoría del vehículo, si está disponible."""
+  tipo: TipoVehiculo
 
   """Filtra por vehículo."""
   vehiculoId: Int

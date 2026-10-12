@@ -1,6 +1,7 @@
 package com.rentar.customerservice.grpc;
 
 import com.rentar.customerservice.entity.Customer;
+import com.rentar.customerservice.entity.Role;
 import com.rentar.customerservice.service.CustomerService;
 
 import io.grpc.Status;
@@ -126,7 +127,19 @@ public class CustomerGrpcService
                                 ? ""
                                 : customer.getFechaNacimiento().toString())
                 .setActivo(customer.isActivo())
+                .setRol(mapRoleToProto(customer.getRol()))
                 .build();
+    }
+
+    private com.rentar.customerservice.grpc.Role mapRoleToProto(Role role) {
+        if (role == null) {
+            return com.rentar.customerservice.grpc.Role.CLIENTE;
+        }
+
+        return switch (role) {
+            case ADMINISTRADOR -> com.rentar.customerservice.grpc.Role.ADMINISTRADOR;
+            case CLIENTE -> com.rentar.customerservice.grpc.Role.CLIENTE;
+        };
     }
 
     private String safeString(String value) {
@@ -158,5 +171,15 @@ public class CustomerGrpcService
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();
+    }
+
+    @Override
+    public void authenticateCustomer(
+            AuthenticateCustomerRequest request,
+            StreamObserver<CustomerResponse> responseObserver) {
+
+        respond(responseObserver, () ->
+                toResponse(customerService.authenticate(request.getEmail(), request.getPassword()))
+        );
     }
 }

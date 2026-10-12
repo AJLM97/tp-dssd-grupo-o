@@ -32,9 +32,9 @@ export class ReservasInput {
 
   @Field(() => TipoVehiculo, {
     nullable: true,
-    description: 'Filtra por la categoría del vehículo reservado.',
+    description: 'Categoría del vehículo, si está disponible.',
   })
-  tipoVehiculo?: TipoVehiculo;
+  tipo?: TipoVehiculo | null;
 
   @Field(() => EstadoReserva, {
     nullable: true,
