@@ -66,7 +66,7 @@ export function CustomerDashboard({
               <Input label="Precio minimo" type="number" value={availabilityFilters.minDailyPrice} onChange={(event) => setAvailabilityFilters((current) => ({ ...current, minDailyPrice: event.target.value }))} />
               <Input label="Precio maximo" type="number" value={availabilityFilters.maxDailyPrice} onChange={(event) => setAvailabilityFilters((current) => ({ ...current, maxDailyPrice: event.target.value }))} />
               <div className="flex items-end">
-                <button type="button" onClick={() => setAvailabilityFilters(DEFAULT_AVAILABILITY_FILTERS)} className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium">Eliminar filtros</button>
+                <button type="button" onClick={() => setAvailabilityFilters(DEFAULT_AVAILABILITY_FILTERS)} className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium cursor-pointer">Eliminar filtros</button>
               </div>
             </div>
           </SectionCard>
@@ -118,7 +118,7 @@ export function CustomerDashboard({
               <p>Estado cliente: {currentClient?.active ? "Activo" : "Inactivo"}</p>
               {reservationPreview ? <p className="font-semibold text-zinc-900">Vista previa: {reservationPreview.days} dias x {formatCurrency(reservationPreview.dailyPrice)} = {formatCurrency(reservationPreview.total)}</p> : <p>Completa vehiculo + fechas para calcular importe.</p>}
             </div>
-            <div><button type="button" onClick={onCreateReservation} className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">Confirmar reserva</button></div>
+            <div><button type="button" onClick={onCreateReservation} className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 cursor-pointer">Confirmar reserva</button></div>
           </div>
         </SectionCard>
       ) : null}

@@ -1,6 +1,7 @@
 package com.rentar.customerservice.service;
 
 import com.rentar.customerservice.entity.Customer;
+import com.rentar.customerservice.entity.Role;
 import com.rentar.customerservice.grpc.CreateCustomerRequest;
 import com.rentar.customerservice.grpc.UpdateCustomerRequest;
 import com.rentar.customerservice.repository.CustomerRepository;
@@ -68,6 +69,8 @@ public class CustomerService {
         customer.setFechaNacimiento(fechaNacimiento);
         customer.setActivo(true);
 
+        customer.setRol(Role.CLIENTE);
+
         return repository.saveAndFlush(customer);
     }
 
@@ -121,6 +124,35 @@ public class CustomerService {
     public Optional<Customer> findForValidation(long id) {
         validateId(id);
         return repository.findById(id);
+    }
+
+    @Transactional(readOnly = true)
+    public Customer authenticate(String email, String password) {
+
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            throw Status.INVALID_ARGUMENT
+                    .withDescription("El email y la contraseña son obligatorios")
+                    .asRuntimeException();
+        }
+
+        Customer customer = repository.findByEmail(email.toLowerCase(Locale.ROOT).trim())
+                .orElseThrow(() -> Status.UNAUTHENTICATED
+                        .withDescription("Credenciales inválidas")
+                        .asRuntimeException());
+
+        if (!customer.isActivo()) {
+            throw Status.PERMISSION_DENIED
+                    .withDescription("El usuario se encuentra inactivo")
+                    .asRuntimeException();
+        }
+
+        if (!passwordEncoder.matches(password, customer.getPassword())) {
+            throw Status.UNAUTHENTICATED
+                    .withDescription("Credenciales inválidas")
+                    .asRuntimeException();
+        }
+
+        return customer;
     }
 
     private void validateId(long id) {

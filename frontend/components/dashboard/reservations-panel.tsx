@@ -68,7 +68,11 @@ export function ReservationsPanel({
                 const canCancel = role === "CLIENTE" && reservation.clientId === currentClientId && reservation.status === "CONFIRMADA" && !hasRentalStarted(reservation.startAt);
                 return (
                   <tr key={reservation.id} className="border-b border-zinc-100">
-                    <td className="py-2">{client ? `${client.firstName} ${client.lastName}` : "-"}</td><td>{vehicle ? `${vehicle.brand} ${vehicle.model}` : "-"}</td><td>{vehicle?.licensePlate ?? "-"}</td><td>{formatDateTime(reservation.startAt)}</td><td>{formatDateTime(reservation.endAt)}</td><td>{formatCurrency(reservation.dailyPrice)}</td><td>{formatCurrency(reservation.totalAmount)}</td><td>{reservationStatusLabel(status)}</td>
+                    <td className="py-2">{client ? `${client.firstName} ${client.lastName}` : "-"}</td><td>
+  {vehicle
+    ? `${vehicle.brand} ${vehicle.model} (${reservation.vehicleType ?? "Tipo desconocido"})`
+    : "-"}
+</td><td>{vehicle?.licensePlate ?? "-"}</td><td>{formatDateTime(reservation.startAt)}</td><td>{formatDateTime(reservation.endAt)}</td><td>{formatCurrency(reservation.dailyPrice)}</td><td>{formatCurrency(reservation.totalAmount)}</td><td>{reservationStatusLabel(status)}</td>
                     <td>{canCancel ? <button type="button" onClick={() => onCancelReservation(reservation.id)} className="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100">Cancelar reserva</button> : null}</td>
                   </tr>
                 );

@@ -6,14 +6,26 @@ const httpLink = new HttpLink({
 });
 
 const authLink = new SetContextLink((prevContext) => {
-  const activeUserId = typeof window !== 'undefined'
-    ? localStorage.getItem('activeUserId') || '2'
-    : '2';
+  const sesionGuardada =
+    typeof window !== "undefined"
+      ? localStorage.getItem("rentar-session")
+      : null;
+
+  const sesion = sesionGuardada
+    ? JSON.parse(sesionGuardada) as {
+      access_token: string;
+      user: { id: number };
+    }
+    : null;
 
   return {
     headers: {
       ...prevContext.headers,
-      'x-usuario-id': activeUserId,
+      ...(sesion
+        ? {
+          Authorization: `Bearer ${sesion.access_token}`,
+        }
+        : {}),
     },
   };
 });

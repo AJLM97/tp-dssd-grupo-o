@@ -1,11 +1,6 @@
 package com.rentar.customerservice.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 import java.time.LocalDate;
 
@@ -39,6 +34,10 @@ public class Customer {
 
     @Column(nullable = false)
     private boolean activo = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role rol;
 
     public Customer() {
     }
@@ -113,5 +112,13 @@ public class Customer {
 
     public void setActivo(boolean activo) {
         this.activo = activo;
+    }
+
+    public Role getRol() {
+        return rol;
+    }
+
+    public void setRol(Role rol) {
+        this.rol = rol;
     }
 }

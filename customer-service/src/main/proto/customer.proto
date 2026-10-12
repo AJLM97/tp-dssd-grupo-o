@@ -13,6 +13,13 @@ service CustomerService {
   rpc GetCustomers (GetCustomersRequest) returns (GetCustomersResponse);
   rpc GetCustomerById (GetCustomerByIdRequest) returns (CustomerResponse);
   rpc ValidateCustomer (ValidateCustomerRequest) returns (ValidateCustomerResponse);
+  rpc AuthenticateCustomer (AuthenticateCustomerRequest) returns (CustomerResponse);
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  CLIENTE = 1;
+  ADMINISTRADOR = 2;
 }
 
 message CustomerResponse {
@@ -24,6 +31,7 @@ message CustomerResponse {
   string telefono = 6;
   string fecha_nacimiento = 7;
   bool activo = 8;
+  Role rol = 9;
 }
 
 message CreateCustomerRequest {
@@ -69,4 +77,9 @@ message ValidateCustomerResponse {
   bool valido = 1;
   bool activo = 2;
   string mensaje = 3;
+}
+
+message AuthenticateCustomerRequest {
+  string email = 1;
+  string password = 2;
 }
