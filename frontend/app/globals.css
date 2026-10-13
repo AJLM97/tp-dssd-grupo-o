@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f7f4;
+  --foreground: #1b2821;
+  --canvas: #f2f5f1;
+  --ink: #1b2821;
+  --forest: #1b4433;
+  --orange: #ef7652;
+  --mint: #dce9dc;
+  --line: #d9e0d9;
+  --muted: #68766e;
 }
 
 @theme inline {
@@ -22,5 +29,854 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+button,
+a,
+input,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.rentar-app {
+  background-color: var(--canvas);
+  background-image: linear-gradient(90deg, rgb(24 55 45 / 2.5%) 1px, transparent 1px), linear-gradient(rgb(24 55 45 / 2.5%) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+.rentar-dashboard-header {
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  background: linear-gradient(122deg, #173c2d 0%, #24503c 68%, #53634d 100%);
+  box-shadow: 0 16px 34px rgb(23 35 30 / 12%);
+  position: relative;
+  overflow: hidden;
+}
+
+.rentar-dashboard-header::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  background: var(--orange);
+}
+
+.dashboard-title-row,
+.brand-mark,
+.dashboard-account-link {
+  display: flex;
+  align-items: center;
+}
+
+.dashboard-title-row {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.brand-mark {
+  gap: 10px;
+  width: fit-content;
+  color: white;
+  text-decoration: none;
+}
+
+.brand-mark-symbol {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--orange);
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.brand-mark-name {
+  font-size: 23px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.brand-mark-name span {
+  color: var(--orange);
+}
+
+.dashboard-caption {
+  margin: 7px 0 0 46px;
+  color: #d0dfd6;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.3px;
+}
+
+.dashboard-account-link {
+  gap: 9px;
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 6px;
+  padding: 9px 12px;
+  color: white;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.dashboard-account-link:hover {
+  border-color: white;
+  background: rgb(255 255 255 / 10%);
+}
+
+.rentar-dashboard-header label {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.rentar-section-nav {
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+
+.rentar-nav-button {
+  min-height: 40px;
+  border: 1px solid #dce4df;
+  border-radius: 6px;
+  padding-inline: 16px;
+  background: white;
+  font-size: 13px;
+}
+
+.rentar-nav-button[class*="bg-emerald-600"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: white;
+}
+
+.rentar-nav-button:hover {
+  transform: translateY(-1px);
+}
+
+.rentar-panel {
+  border-color: var(--line);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgb(23 35 30 / 4%);
+}
+
+.rentar-panel > div:first-child {
+  border-bottom: 1px solid #edf0ed;
+  padding-bottom: 13px;
+}
+
+.rentar-panel h2 {
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.rentar-input {
+  min-height: 42px;
+  border-color: #d7dfda;
+  border-radius: 5px;
+  background: #fbfcfb;
+}
+
+.rentar-input:focus {
+  border-color: var(--orange);
+  outline-color: var(--orange);
+}
+
+.rentar-panel table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.rentar-panel thead th {
+  padding: 11px 12px;
+  background: #f5f7f5;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.rentar-panel tbody td {
+  padding: 13px 12px;
+  color: #33443b;
+  font-size: 13px;
+}
+
+.customer-vehicle-feature {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #243b30;
+  isolation: isolate;
+}
+
+.customer-vehicle-feature::after {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(12 24 21 / 76%) 0%, rgb(12 24 21 / 38%) 48%, rgb(12 24 21 / 4%) 100%);
+  content: "";
+}
+
+.customer-vehicle-feature > img {
+  z-index: -1;
+  object-fit: cover;
+  object-position: center 55%;
+}
+
+.customer-vehicle-feature-copy {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: clamp(24px, 5vw, 64px);
+  max-width: 560px;
+  color: white;
+  transform: translateY(-50%);
+}
+
+.customer-vehicle-feature-copy p {
+  color: #ffd0ad;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.customer-vehicle-feature-copy h2 {
+  margin-top: 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 38px;
+  font-weight: 500;
+  line-height: 1.08;
+}
+
+.customer-vehicle-feature-index {
+  position: absolute;
+  z-index: 1;
+  right: 22px;
+  bottom: 20px;
+  color: white;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 1.1px;
+}
+
+.rentar-home {
+  min-height: 100svh;
+  background: #f6f7f4;
+  color: #182720;
+}
+
+.rentar-home-hero {
+  position: relative;
+  display: flex;
+  min-height: min(760px, 88svh);
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 30px clamp(24px, 6vw, 88px) 34px;
+  background-color: #264334;
+  background-position: center 56%;
+  background-size: cover;
+  color: white;
+  animation: auth-enter 600ms ease both;
+}
+
+.rentar-home-nav,
+.rentar-home-nav nav,
+.rentar-home-actions,
+.rentar-home-image-caption {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.rentar-home-nav {
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.rentar-home-nav nav {
+  gap: 28px;
+}
+
+.rentar-home-nav nav a,
+.rentar-home-secondary {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.rentar-home-nav nav a:hover,
+.rentar-home-secondary:hover {
+  color: #ffd0b5;
+}
+
+.rentar-home-nav .rentar-home-nav-cta {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 5px;
+  padding: 0 14px;
+}
+
+.rentar-home-copy {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 650px);
+  margin-block: 76px 100px;
+  animation: auth-enter 650ms ease 80ms both;
+}
+
+.rentar-home-eyebrow {
+  color: #ffc09f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.rentar-home-copy h1 {
+  margin-top: 21px;
+  color: white;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 72px;
+  font-weight: 500;
+  line-height: 0.98;
+}
+
+.rentar-home-intro {
+  max-width: 430px;
+  margin-top: 22px;
+  color: #edf2ee;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.rentar-home-actions {
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.rentar-home-primary {
+  display: inline-flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  border-radius: 5px;
+  padding: 0 17px;
+  background: #f26b45;
+  color: #1c2923;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.rentar-home-primary:hover {
+  transform: translateY(-2px);
+  background: #ff815d;
+}
+
+.rentar-home-image-caption {
+  justify-content: space-between;
+  gap: 16px;
+  color: #e8efea;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rentar-home-image-caption span:last-child {
+  color: #ffc09f;
+  font-size: 10px;
+  letter-spacing: 1.1px;
+}
+
+.rentar-home-next {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr auto;
+  align-items: end;
+  gap: 38px;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 46px clamp(24px, 6vw, 88px) 52px;
+  animation: auth-enter 600ms ease 160ms both;
+}
+
+.rentar-home-next .rentar-home-eyebrow {
+  color: #a3482c;
+}
+
+.rentar-home-next h2 {
+  margin-top: 9px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.rentar-home-next > p {
+  max-width: 420px;
+  color: #627067;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.rentar-home-next > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #a3482c;
+  padding-bottom: 7px;
+  color: #863d28;
+  font-size: 13px;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.auth-page {
+  display: grid;
+  min-height: 100svh;
+  grid-template-columns: minmax(0, 1.04fr) minmax(440px, 0.96fr);
+  background: #fbfcfa;
+}
+
+.auth-visual {
+  position: relative;
+  display: flex;
+  min-height: 100svh;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: clamp(24px, 4vw, 58px);
+  background-color: #24372f;
+  background-image: linear-gradient(180deg, rgb(16 30 24 / 34%) 0%, rgb(16 30 24 / 18%) 36%, rgb(16 30 24 / 84%) 100%), url("/images/Captura%20de%20pantalla%202026-10-11%20170017.jpg");
+  background-position: 58% center;
+  background-size: cover;
+  color: white;
+}
+
+.auth-visual-register {
+  background-image: linear-gradient(180deg, rgb(16 30 24 / 36%) 0%, rgb(16 30 24 / 18%) 36%, rgb(16 30 24 / 84%) 100%), url("/images/Captura%20de%20pantalla%202026-10-11%20173300.jpg");
+  background-position: 54% center;
+}
+
+.auth-visual-top,
+.auth-visual-caption {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.auth-location,
+.auth-visual-caption {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.auth-visual-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 530px;
+  padding: 56px 0 72px;
+  animation: auth-enter 650ms ease both;
+}
+
+.auth-kicker,
+.auth-eyebrow {
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.auth-visual-copy h1 {
+  margin: 20px 0;
+  font-size: clamp(58px, 7vw, 104px);
+  font-weight: 750;
+  line-height: 0.92;
+}
+
+.auth-visual-copy > p:last-child {
+  max-width: 330px;
+  color: #edf3ef;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.auth-visual-caption {
+  color: #edf3ef;
+  letter-spacing: 0;
+}
+
+.auth-form-side {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 32px clamp(28px, 7vw, 104px) 22px;
+}
+
+.auth-mobile-brand {
+  display: none;
+}
+
+.auth-form-wrap {
+  width: 100%;
+  max-width: 430px;
+  margin: auto;
+  padding-block: 48px;
+  animation: auth-enter 500ms ease 80ms both;
+}
+
+.auth-eyebrow {
+  margin-bottom: 16px;
+}
+
+.auth-form-wrap h2 {
+  color: var(--ink);
+  font-size: clamp(32px, 3.4vw, 43px);
+  font-weight: 730;
+  line-height: 1.12;
+}
+
+.auth-intro {
+  margin-top: 12px;
+  color: #69766f;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.auth-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.auth-form label > span:first-child {
+  margin-bottom: 2px;
+  color: #32433a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.auth-form .rentar-input {
+  min-height: 48px;
+  padding-inline: 14px;
+  background: white;
+}
+
+.auth-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.auth-form-meta,
+.auth-remember,
+.auth-terms {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #59675f;
+  font-size: 12px;
+}
+
+.auth-remember,
+.auth-terms {
+  justify-content: flex-start;
+}
+
+.auth-remember input,
+.auth-terms input {
+  accent-color: var(--forest);
+}
+
+.auth-text-button,
+.auth-switch a,
+.auth-demo-link {
+  color: #a3482c;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-submit {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 17px;
+  background: var(--forest);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.auth-submit:hover {
+  background: #24533f;
+  transform: translateY(-1px);
+}
+
+.auth-submit span {
+  color: #ffc29f;
+  font-size: 18px;
+}
+
+.auth-notice {
+  border-left: 3px solid var(--orange);
+  padding: 10px 12px;
+  background: #fff4ee;
+  color: #703b2a;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.auth-switch {
+  margin-top: 25px;
+  color: #69766f;
+  font-size: 13px;
+}
+
+.auth-switch a {
+  font-size: 13px;
+}
+
+.auth-demo-link {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.auth-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e6ebe7;
+  padding-top: 16px;
+  color: #89958e;
+  font-size: 10px;
+}
+
+@keyframes auth-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 900px) {
+  .rentar-home-next {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  .rentar-home-next > a {
+    grid-column: 2;
+  }
+
+  .auth-page {
+    grid-template-columns: 0.82fr 1fr;
+  }
+
+  .auth-form-side {
+    padding-inline: 34px;
+  }
+}
+
+@media (max-width: 700px) {
+  .rentar-app > div,
+  .rentar-app .grid,
+  .rentar-app .grid > *,
+  .rentar-app .rentar-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .rentar-app .overflow-x-auto {
+    max-width: 100%;
+  }
+
+  .customer-vehicle-feature {
+    min-height: 290px;
+  }
+
+  .customer-vehicle-feature-copy h2 {
+    font-size: 30px;
+  }
+
+  .customer-vehicle-feature-index {
+    right: 14px;
+    bottom: 14px;
+    font-size: 9px;
+  }
+
+  .rentar-home-hero {
+    min-height: 690px;
+    padding: 22px 22px 24px;
+    background-position: 61% center;
+  }
+
+  .rentar-home-nav {
+    align-items: flex-start;
+  }
+
+  .rentar-home-nav nav {
+    gap: 14px;
+  }
+
+  .rentar-home-nav nav > a:first-child {
+    display: none;
+  }
+
+  .rentar-home-nav nav a,
+  .rentar-home-secondary {
+    font-size: 12px;
+  }
+
+  .rentar-home-nav .rentar-home-nav-cta {
+    min-height: 38px;
+    gap: 7px;
+    padding-inline: 10px;
+  }
+
+  .rentar-home-copy {
+    margin-block: 92px 82px;
+  }
+
+  .rentar-home-copy h1 {
+    font-size: 52px;
+  }
+
+  .rentar-home-intro {
+    max-width: 340px;
+    font-size: 14px;
+  }
+
+  .rentar-home-actions {
+    align-items: flex-start;
+    gap: 17px;
+  }
+
+  .rentar-home-image-caption {
+    align-items: flex-end;
+    font-size: 10px;
+  }
+
+  .rentar-home-image-caption span:last-child {
+    max-width: 120px;
+    text-align: right;
+  }
+
+  .rentar-home-next {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    padding: 32px 22px 38px;
+  }
+
+  .rentar-home-next h2 {
+    font-size: 27px;
+  }
+
+  .rentar-home-next > a {
+    grid-column: 1;
+    justify-self: start;
+    margin-top: 4px;
+  }
+
+  .rentar-app {
+    padding: 16px 12px 28px;
+  }
+
+  .rentar-dashboard-header {
+    padding: 18px 16px;
+  }
+
+  .rentar-section-nav {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    margin-inline: -2px;
+    padding: 0 2px 12px;
+  }
+
+  .rentar-nav-button {
+    flex: 0 0 auto;
+    padding-inline: 13px;
+  }
+
+  .auth-page {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .auth-visual {
+    min-height: 270px;
+    padding: 22px 24px;
+    background-position: center 56%;
+  }
+
+  .auth-visual-copy {
+    padding: 30px 0 22px;
+  }
+
+  .auth-visual-copy h1 {
+    margin: 10px 0;
+    font-size: 54px;
+  }
+
+  .auth-visual-copy > p:last-child,
+  .auth-location,
+  .auth-visual-caption {
+    display: none;
+  }
+
+  .auth-form-side {
+    min-height: calc(100svh - 270px);
+    padding: 25px 24px 18px;
+  }
+
+  .auth-mobile-brand {
+    display: block;
+  }
+
+  .auth-mobile-brand .brand-mark {
+    color: var(--ink);
+  }
+
+  .auth-form-wrap {
+    padding-block: 34px;
+  }
+
+  .auth-form {
+    margin-top: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
