@@ -1,17 +1,15 @@
 package com.rentar.vehicleservice.grpc;
 
 import com.rentar.vehicleservice.entity.EstadoVehiculo;
+import com.rentar.vehicleservice.entity.TipoVehiculo;
 import com.rentar.vehicleservice.entity.Vehicle;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import com.rentar.vehicleservice.service.VehicleService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
-import java.util.function.Supplier;
 
 @GrpcService
 public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBase {
@@ -22,23 +20,57 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         this.vehicleService = vehicleService;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(VehicleGrpcService.class);
-
     @Override
-    public void createVehicle(
-            CreateVehicleRequest request,
-            StreamObserver<VehicleResponse> responseObserver) {
+    public void createVehicle(CreateVehicleRequest request, StreamObserver<VehicleResponse> responseObserver) {
 
-        respond(responseObserver, () -> toResponse(vehicleService.create(request)));
+        try {
+            Vehicle vehicle = new Vehicle();
+            vehicle.setPatente(request.getPatente().trim());
+            vehicle.setMarca(request.getMarca().trim());
+            vehicle.setModelo(request.getModelo().trim());
+            vehicle.setAnio(request.getAnio());
+            vehicle.setColor(request.getColor().isBlank() ? null : request.getColor().trim());
+            vehicle.setTipo(toTipo(request.getTipo()));
+            vehicle.setPrecioDiario(request.getPrecioDiario());
+
+            Vehicle creado = vehicleService.create(vehicle);
+            responseObserver.onNext(toResponse(creado));
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override
-    public void updateVehicle(
-            UpdateVehicleRequest request,
-            StreamObserver<VehicleResponse> responseObserver) {
+    public void updateVehicle(UpdateVehicleRequest request, StreamObserver<VehicleResponse> responseObserver) {
 
-        respond(responseObserver,
-                () -> toResponse(vehicleService.update(request)));
+        try {
+            Vehicle datos = new Vehicle();
+            datos.setMarca(request.getMarca().trim());
+            datos.setModelo(request.getModelo().trim());
+            datos.setAnio(request.getAnio());
+            datos.setColor(request.getColor().isBlank() ? null : request.getColor().trim());
+            datos.setTipo(toTipo(request.getTipo()));
+            datos.setPrecioDiario(request.getPrecioDiario());
+
+            Vehicle actualizado = vehicleService.update(request.getId(), datos);
+            responseObserver.onNext(toResponse(actualizado));
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void deleteVehicle(DeleteVehicleRequest request, StreamObserver<VehicleResponse> responseObserver) {
+
+        try {
+            Vehicle vehicle = vehicleService.delete(request.getId());
+            responseObserver.onNext(toResponse(vehicle));
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override
@@ -123,28 +155,10 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
                 .build();
     }
 
-    private <T> void respond(
-            StreamObserver<T> responseObserver,
-            Supplier<T> operation) {
-
-        T response;
-
-        try {
-            response = operation.get();
-        } catch (StatusRuntimeException exception) {
-            responseObserver.onError(exception);
-            return;
-        } catch (Exception exception) {
-            log.error("Error al procesar la solicitud de crear vehiculo", exception);
-
-            responseObserver.onError(
-                    Status.INTERNAL
-                            .withDescription("No se pudo procesar la solicitud de crear vehiculo")
-                            .asRuntimeException());
-            return;
+    private TipoVehiculo toTipo(VehicleType tipo) {
+        if (tipo == VehicleType.VEHICLE_TYPE_UNSPECIFIED || tipo == VehicleType.UNRECOGNIZED) {
+            throw Status.INVALID_ARGUMENT.withDescription("El tipo de vehiculo no es valido!").asRuntimeException();
         }
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        return TipoVehiculo.valueOf(tipo.name());
     }
 }
