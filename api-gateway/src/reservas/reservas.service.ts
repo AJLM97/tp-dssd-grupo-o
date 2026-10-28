@@ -10,7 +10,7 @@ interface RentalServiceGrpc {
 }
 
 interface VehicleServiceGrpc {
-  getVehicles(data: { solo_activos: boolean }): Observable<{
+  getVehicles(data: { soloActivos: boolean }): Observable<{
     vehicles: Array<{
       id: number | string;
       tipo: number | string;
@@ -56,7 +56,7 @@ export class ReservasService implements OnModuleInit {
         }),
       ),
       lastValueFrom(
-        this.vehicleGrpcService.getVehicles({ solo_activos: false }),
+        this.vehicleGrpcService.getVehicles({ soloActivos: false }),
       ),
     ]);
 
