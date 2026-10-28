@@ -57,6 +57,20 @@ const SECTION_LABELS: Record<UiSection, string> = {
   HISTORIAL: "Mi historial",
 };
 
+// Devuelve el token del login guardado; sin sesión, el error lo muestra el catch de quien la llama
+function obtenerToken(): string {
+  const sesionGuardada = localStorage.getItem("rentar-session");
+  const sesion = sesionGuardada
+    ? (JSON.parse(sesionGuardada) as { access_token?: string })
+    : null;
+
+  if (!sesion?.access_token) {
+    throw new Error("No se encontró el token de sesión. Iniciá sesión nuevamente.");
+  }
+
+  return sesion.access_token;
+}
+
 function normalizarId(id: unknown): number {
   let resultado: number;
 
@@ -366,16 +380,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
         activo: vehicleForm.active,
       };
 
-      const sesionGuardada = localStorage.getItem("rentar-session");
-      const sesion = sesionGuardada
-        ? (JSON.parse(sesionGuardada) as { access_token?: string })
-        : null;
-      const accessToken = sesion?.access_token;
-
-      if (!accessToken) {
-        setFeedback("No se encontró el token de sesión. Iniciá sesión nuevamente.");
-        return;
-      }
+      const accessToken = obtenerToken();
 
       if (vehicleEditingId !== null) {
         await saveVehiculo(payload, true, vehicleEditingId, accessToken);
@@ -411,16 +416,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
     }
 
     try {
-      const sesionGuardada = localStorage.getItem("rentar-session");
-      const sesion = sesionGuardada
-        ? (JSON.parse(sesionGuardada) as { access_token?: string })
-        : null;
-      const accessToken = sesion?.access_token;
-
-      if (!accessToken) {
-        setFeedback("No se encontró el token de sesión. Iniciá sesión nuevamente.");
-        return;
-      }
+      const accessToken = obtenerToken();
 
       const payload = {
         documento: clientForm.document.trim(),
@@ -451,7 +447,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
 
   async function handleVehicleDelete(id: number) {
     try {
-      await deleteVehiculoApi(id);
+      await deleteVehiculoApi(id, obtenerToken());
       await reloadData();
       setFeedback("Baja lógica de vehículo realizada.");
     } catch (err: any) {
@@ -461,7 +457,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
 
   async function handleClientDelete(id: number) {
     try {
-      await deleteClienteApi(id);
+      await deleteClienteApi(id, obtenerToken());
       await reloadData();
       setFeedback("Baja lógica de cliente realizada.");
     } catch (err: any) {

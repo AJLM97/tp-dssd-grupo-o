@@ -59,8 +59,11 @@ export async function crearVehiculo(
   return resultado;
 }
 
-export async function deleteVehiculoApi(id: number) {
-  const res = await fetch(`${API_URL}/vehiculos/${id}`, { method: "DELETE" });
+export async function deleteVehiculoApi(id: number, accessToken: string) {
+  const res = await fetch(`${API_URL}/vehiculos/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error("Error al dar de baja el vehículo");
   return res.json();
 }
@@ -154,8 +157,11 @@ export async function iniciarSesion(email: string, password: string) {
   } as RespuestaLogin;
 }
 
-export async function deleteClienteApi(id: number) {
-  const res = await fetch(`${API_URL}/clientes/${id}`, { method: "DELETE" });
+export async function deleteClienteApi(id: number, accessToken: string) {
+  const res = await fetch(`${API_URL}/clientes/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error("Error al dar de baja el cliente");
   return res.json();
 }
