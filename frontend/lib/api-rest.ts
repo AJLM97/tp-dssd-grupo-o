@@ -163,7 +163,6 @@ export async function deleteClienteApi(id: number) {
 type DatosReserva = {
   clienteId: number | string;
   vehiculoId: number | string;
-  precioDiario: number | string;
   fechaInicio: string;
   fechaFin: string;
 };
@@ -173,7 +172,6 @@ export async function postReserva({
   vehiculoId,
   fechaInicio,
   fechaFin,
-  precioDiario,
 }: DatosReserva) {
   const respuesta = await fetch(`${API_URL}/reservas`, {
     method: "POST",
@@ -181,7 +179,6 @@ export async function postReserva({
     body: JSON.stringify({
       clienteId: Number(clienteId),
       vehiculoId: Number(vehiculoId),
-      precioDiario: Number(precioDiario),
       fechaInicio: new Date(fechaInicio).toISOString().slice(0, 19),
       fechaFin: new Date(fechaFin).toISOString().slice(0, 19),
     }),

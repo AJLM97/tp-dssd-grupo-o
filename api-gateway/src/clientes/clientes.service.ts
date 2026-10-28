@@ -41,4 +41,8 @@ export class ClientesService implements OnModuleInit {
   async bajaLogica(id: number) {
     return await lastValueFrom(this.customerGrpcService.deleteCustomer({ id }));
   }
+
+  async validar(id: number) {
+    return await lastValueFrom(this.customerGrpcService.validateCustomer({ id }));
+  }
 }

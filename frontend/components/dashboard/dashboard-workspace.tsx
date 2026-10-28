@@ -530,7 +530,6 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       await postReserva({
         clienteId,
         vehiculoId: vehiculoSeleccionado.id,
-        precioDiario: vehiculoSeleccionado.dailyPrice,
         fechaInicio: reservationStartAt,
         fechaFin: reservationEndAt,
       });

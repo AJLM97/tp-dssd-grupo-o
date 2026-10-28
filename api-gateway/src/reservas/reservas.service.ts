@@ -1,6 +1,7 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { type ClientGrpc } from '@nestjs/microservices';
 import { Observable, lastValueFrom } from 'rxjs';
+import { ClientesService } from '../clientes/clientes.service';
 
 interface RentalServiceGrpc {
   createRental(data: any): Observable<any>;
@@ -16,6 +17,12 @@ interface VehicleServiceGrpc {
       tipo: number | string;
     }>;
   }>;
+  getVehicleById(data: { id: number }): Observable<{ precioDiario: number }>;
+  // proto3 no envía los false: si el vehículo no está disponible, "disponible" llega vacío
+  checkAvailability(data: { vehicleId: number; fechaInicio: string; fechaFin: string }): Observable<{
+    disponible?: boolean;
+    mensaje: string;
+  }>;
 }
 
 @Injectable()
@@ -23,20 +30,37 @@ export class ReservasService implements OnModuleInit {
   private rentalGrpcService: RentalServiceGrpc;
   private vehicleGrpcService: VehicleServiceGrpc;
 
-  constructor(@Inject('RENTAL_SERVICE') private readonly client: ClientGrpc, @Inject('VEHICLE_SERVICE') private readonly vehicleClient: ClientGrpc) { }
+  constructor(@Inject('RENTAL_SERVICE') private readonly client: ClientGrpc, @Inject('VEHICLE_SERVICE') private readonly vehicleClient: ClientGrpc, private readonly clientesService: ClientesService) { }
 
   onModuleInit() {
     this.rentalGrpcService = this.client.getService<RentalServiceGrpc>('RentalService');
     this.vehicleGrpcService = this.vehicleClient.getService<VehicleServiceGrpc>('VehicleService');
   }
 
+  // Coordina el alta como pide el enunciado: cliente activo, vehículo activo y precio del vehículo antes de reservar
   async crearReserva(data: any) {
+    const cliente = await this.clientesService.validar(data.clienteId);
+    if (!cliente.valido) {
+      throw new BadRequestException(cliente.mensaje);
+    }
+
+    const disponibilidad = await lastValueFrom(this.vehicleGrpcService.checkAvailability({
+      vehicleId: data.vehiculoId,
+      fechaInicio: data.fechaInicio,
+      fechaFin: data.fechaFin,
+    }));
+    if (!disponibilidad.disponible) {
+      throw new BadRequestException(disponibilidad.mensaje);
+    }
+
+    const vehiculo = await lastValueFrom(this.vehicleGrpcService.getVehicleById({ id: data.vehiculoId }));
+
     return await lastValueFrom(this.rentalGrpcService.createRental({
       customerId: data.clienteId,
       vehicleId: data.vehiculoId,
       fechaInicio: data.fechaInicio,
       fechaFin: data.fechaFin,
-      precioDiario: data.precioDiario || 0,
+      precioDiario: vehiculo.precioDiario,
     }));
   }
 
