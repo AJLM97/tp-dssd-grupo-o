@@ -52,7 +52,7 @@ public class RentalService {
                     .asRuntimeException();
         }
 
-        long dias = Math.max(1, Duration.between(fechaInicio, fechaFin).toDays());
+        long dias = calcularDias(fechaInicio, fechaFin);
         double importeTotal = dias * precioDiario;
 
         Rental rental = new Rental();
@@ -110,7 +110,22 @@ public class RentalService {
     @Transactional(readOnly = true)
     public List<Rental> getHistory(long customerId) {
         validateId(customerId, "customerId");
-        return repository.findHistoryByCustomerId(customerId);
+        return repository.findHistoryByCustomerId(customerId, LocalDateTime.now());
+    }
+
+    // Regla del Hito 1: max(1, ceil(duración / 24 h)). La usan el importe y la cantidad de días que se informa
+    public static long calcularDias(LocalDateTime fechaInicio, LocalDateTime fechaFin) {
+        double dias = Duration.between(fechaInicio, fechaFin).toMillis() / (double) Duration.ofDays(1).toMillis();
+        return Math.max(1, (long) Math.ceil(dias));
+    }
+
+    // Una reserva confirmada o en curso cuyo período ya terminó se informa como FINALIZADA (igual que en el Hito 1)
+    public static RentalStatus estadoEfectivo(Rental rental) {
+        boolean activa = rental.getEstado() == RentalStatus.CONFIRMADA || rental.getEstado() == RentalStatus.EN_CURSO;
+        if (activa && rental.getFechaFin().isBefore(LocalDateTime.now())) {
+            return RentalStatus.FINALIZADA;
+        }
+        return rental.getEstado();
     }
 
     private long validateId(long id, String fieldName) {
