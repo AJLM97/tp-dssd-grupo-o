@@ -21,7 +21,7 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     @Override
-    public void createVehicle(CreateVehicleRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void createVehicle(CreateVehicleRequest request, StreamObserver<CreateVehicleResponse> responseObserver) {
 
         try {
             Vehicle vehicle = new Vehicle();
@@ -34,7 +34,9 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
             vehicle.setPrecioDiario(request.getPrecioDiario());
 
             Vehicle creado = vehicleService.create(vehicle);
-            responseObserver.onNext(toResponse(creado));
+            responseObserver.onNext(CreateVehicleResponse.newBuilder()
+                    .setVehicle(toVehicleData(creado))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -42,7 +44,7 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     @Override
-    public void updateVehicle(UpdateVehicleRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void updateVehicle(UpdateVehicleRequest request, StreamObserver<UpdateVehicleResponse> responseObserver) {
 
         try {
             Vehicle datos = new Vehicle();
@@ -54,7 +56,9 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
             datos.setPrecioDiario(request.getPrecioDiario());
 
             Vehicle actualizado = vehicleService.update(request.getId(), datos);
-            responseObserver.onNext(toResponse(actualizado));
+            responseObserver.onNext(UpdateVehicleResponse.newBuilder()
+                    .setVehicle(toVehicleData(actualizado))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -62,11 +66,13 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     @Override
-    public void deleteVehicle(DeleteVehicleRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void deleteVehicle(DeleteVehicleRequest request, StreamObserver<DeleteVehicleResponse> responseObserver) {
 
         try {
             Vehicle vehicle = vehicleService.delete(request.getId());
-            responseObserver.onNext(toResponse(vehicle));
+            responseObserver.onNext(DeleteVehicleResponse.newBuilder()
+                    .setVehicle(toVehicleData(vehicle))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -74,11 +80,13 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     @Override
-    public void getVehicleById(GetVehicleByIdRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void getVehicleById(GetVehicleByIdRequest request, StreamObserver<GetVehicleByIdResponse> responseObserver) {
 
         try {
             Vehicle vehicle = vehicleService.getById(request.getId());
-            responseObserver.onNext(toResponse(vehicle));
+            responseObserver.onNext(GetVehicleByIdResponse.newBuilder()
+                    .setVehicle(toVehicleData(vehicle))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -90,7 +98,7 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         GetVehiclesResponse.Builder response = GetVehiclesResponse.newBuilder();
 
         for (Vehicle vehicle : vehicleService.getAll(request.getSoloActivos())) {
-            response.addVehicles(toResponse(vehicle));
+            response.addVehicles(toVehicleData(vehicle));
         }
 
         responseObserver.onNext(response.build());
@@ -98,15 +106,18 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     @Override
-    public void updateVehicleStatus(UpdateVehicleStatusRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void updateVehicleStatus(UpdateVehicleStatusRequest request, StreamObserver<UpdateVehicleStatusResponse> responseObserver) {
 
         try {
             if (request.getNuevoEstado() == VehicleStatus.VEHICLE_STATUS_UNSPECIFIED || request.getNuevoEstado() == VehicleStatus.UNRECOGNIZED) {
                 throw Status.INVALID_ARGUMENT.withDescription("El nuevo estado no es valido!").asRuntimeException();
             }
-            EstadoVehiculo nuevoEstado = EstadoVehiculo.valueOf(request.getNuevoEstado().name());
+            EstadoVehiculo nuevoEstado = EstadoVehiculo.valueOf(
+                    request.getNuevoEstado().name().substring("VEHICLE_STATUS_".length()));
             Vehicle vehicle = vehicleService.updateStatus(request.getId(), nuevoEstado);
-            responseObserver.onNext(toResponse(vehicle));
+            responseObserver.onNext(UpdateVehicleStatusResponse.newBuilder()
+                    .setVehicle(toVehicleData(vehicle))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -140,8 +151,8 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         }
     }
 
-    private VehicleResponse toResponse(Vehicle vehicle) {
-        return VehicleResponse.newBuilder()
+    private VehicleData toVehicleData(Vehicle vehicle) {
+        return VehicleData.newBuilder()
                 .setId(vehicle.getId())
                 .setPatente(vehicle.getPatente())
                 .setMarca(vehicle.getMarca())
@@ -150,8 +161,10 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
                 .setPrecioDiario(vehicle.getPrecioDiario())
                 .setAnio(vehicle.getAnio())
                 .setColor(vehicle.getColor() == null ? "" : vehicle.getColor())
-                .setEstado(VehicleStatus.valueOf(vehicle.getEstado().name()))
-                .setTipo(VehicleType.valueOf(vehicle.getTipo().name()))
+                .setEstado(VehicleStatus.valueOf(
+                        "VEHICLE_STATUS_" + vehicle.getEstado().name()))
+                .setTipo(VehicleType.valueOf(
+                        "VEHICLE_TYPE_" + vehicle.getTipo().name()))
                 .build();
     }
 
@@ -159,6 +172,7 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         if (tipo == VehicleType.VEHICLE_TYPE_UNSPECIFIED || tipo == VehicleType.UNRECOGNIZED) {
             throw Status.INVALID_ARGUMENT.withDescription("El tipo de vehiculo no es valido!").asRuntimeException();
         }
-        return TipoVehiculo.valueOf(tipo.name());
+        return TipoVehiculo.valueOf(
+                tipo.name().substring("VEHICLE_TYPE_".length()));
     }
 }

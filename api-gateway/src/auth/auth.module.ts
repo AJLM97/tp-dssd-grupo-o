@@ -21,7 +21,7 @@ import { GRPC_LOADER } from '../proto/grpc-loader';
         transport: Transport.GRPC,
         options: {
           package: 'customer',
-          protoPath: join(process.cwd(), 'src/proto/customer.proto'),
+          protoPath: join(process.cwd(), 'src/proto/customer/customer.proto'),
           url: process.env.CUSTOMER_SERVICE_URL || 'localhost:9092',
           loader: GRPC_LOADER,
         },
