@@ -30,9 +30,11 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
     @Override
     public void createRental(
             CreateRentalRequest request,
-            StreamObserver<RentalResponse> responseObserver) {
+            StreamObserver<CreateRentalResponse> responseObserver) {
 
-        respond(responseObserver, () -> toResponse(rentalService.create(request)));
+        respond(responseObserver, () -> CreateRentalResponse.newBuilder()
+                .setRental(toRentalData(rentalService.create(request)))
+                .build());
     }
 
     @Override
@@ -49,7 +51,7 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
             );
 
             for (Rental rental : rentals) {
-                builder.addRentals(toResponse(rental));
+                builder.addRentals(toRentalData(rental));
             }
 
             return builder.build();
@@ -59,31 +61,34 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
     @Override
     public void cancelRental(
             CancelRentalRequest request,
-            StreamObserver<RentalResponse> responseObserver) {
+            StreamObserver<CancelRentalResponse> responseObserver) {
 
-        respond(responseObserver, () -> toResponse(rentalService.cancel(request)));
+        respond(responseObserver, () -> CancelRentalResponse.newBuilder()
+                .setRental(toRentalData(rentalService.cancel(request)))
+                .build());
     }
 
     @Override
     public void getRentalHistory(
             GetRentalHistoryRequest request,
-            StreamObserver<GetRentalsResponse> responseObserver) {
+            StreamObserver<GetRentalHistoryResponse> responseObserver) {
 
         respond(responseObserver, () -> {
-            GetRentalsResponse.Builder builder = GetRentalsResponse.newBuilder();
+            GetRentalHistoryResponse.Builder builder =
+                    GetRentalHistoryResponse.newBuilder();
 
             List<Rental> history = rentalService.getHistory(request.getCustomerId());
 
             for (Rental rental : history) {
-                builder.addRentals(toResponse(rental));
+                builder.addRentals(toRentalData(rental));
             }
 
             return builder.build();
         });
     }
 
-    private RentalResponse toResponse(Rental rental) {
-        return RentalResponse.newBuilder()
+    private RentalData toRentalData(Rental rental) {
+        return RentalData.newBuilder()
                 .setId(rental.getId())
                 .setCustomerId(rental.getCustomerId())
                 .setVehicleId(rental.getVehicleId())
@@ -102,10 +107,10 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
         }
 
         return switch (status) {
-            case CONFIRMADA -> com.rentar.rentalservice.grpc.RentalStatus.CONFIRMADA;
-            case EN_CURSO -> com.rentar.rentalservice.grpc.RentalStatus.EN_CURSO;
-            case FINALIZADA -> com.rentar.rentalservice.grpc.RentalStatus.FINALIZADA;
-            case CANCELADA -> com.rentar.rentalservice.grpc.RentalStatus.CANCELADA;
+            case CONFIRMADA -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_CONFIRMADA;
+            case EN_CURSO -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_EN_CURSO;
+            case FINALIZADA -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_FINALIZADA;
+            case CANCELADA -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_CANCELADA;
         };
     }
 

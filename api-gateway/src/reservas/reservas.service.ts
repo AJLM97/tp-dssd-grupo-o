@@ -4,9 +4,9 @@ import { Observable, lastValueFrom } from 'rxjs';
 import { ClientesService } from '../clientes/clientes.service';
 
 interface RentalServiceGrpc {
-  createRental(data: any): Observable<any>;
+  createRental(data: any): Observable<{ rental: any }>;
   getRentals(data: any): Observable<any>;
-  cancelRental(data: any): Observable<any>;
+  cancelRental(data: any): Observable<{ rental: any }>;
   getRentalHistory(data: any): Observable<any>;
 }
 
@@ -17,7 +17,7 @@ interface VehicleServiceGrpc {
       tipo: number | string;
     }>;
   }>;
-  getVehicleById(data: { id: number }): Observable<{ precioDiario: number }>;
+  getVehicleById(data: { id: number }): Observable<{ vehicle: { precioDiario: number } }>;
   // proto3 no envía los false: si el vehículo no está disponible, "disponible" llega vacío
   checkAvailability(data: { vehicleId: number; fechaInicio: string; fechaFin: string }): Observable<{
     disponible?: boolean;
@@ -53,22 +53,26 @@ export class ReservasService implements OnModuleInit {
       throw new BadRequestException(disponibilidad.mensaje);
     }
 
-    const vehiculo = await lastValueFrom(this.vehicleGrpcService.getVehicleById({ id: data.vehiculoId }));
+    const responseVehiculo = await lastValueFrom(
+      this.vehicleGrpcService.getVehicleById({ id: data.vehiculoId }),
+    );
 
-    return await lastValueFrom(this.rentalGrpcService.createRental({
+    const response = await lastValueFrom(this.rentalGrpcService.createRental({
       customerId: data.clienteId,
       vehicleId: data.vehiculoId,
       fechaInicio: data.fechaInicio,
       fechaFin: data.fechaFin,
-      precioDiario: vehiculo.precioDiario,
+      precioDiario: responseVehiculo.vehicle.precioDiario,
     }));
+    return this.normalizarReserva(response.rental);
   }
 
   async cancelarReserva(id: number) {
-    return await lastValueFrom(this.rentalGrpcService.cancelRental({
+    const response = await lastValueFrom(this.rentalGrpcService.cancelRental({
       rentalId: id,
       customerId: 0,
     }));
+    return this.normalizarReserva(response.rental);
   }
 
   async buscar(filtros: any) {
@@ -84,7 +88,9 @@ export class ReservasService implements OnModuleInit {
       ),
     ]);
 
-    const reservas = respuestaReservas.rentals || [];
+    const reservas = (respuestaReservas.rentals || []).map((reserva: any) =>
+      this.normalizarReserva(reserva),
+    );
     const tiposPorNumero: Record<number, string> = {
       1: 'SEDAN',
       2: 'SUV',
@@ -104,7 +110,7 @@ export class ReservasService implements OnModuleInit {
         return tipo;
       }
 
-      return texto;
+      return texto.replace(/^VEHICLE_TYPE_/, '');
     };
 
     const vehiculosPorId = new Map(
@@ -151,6 +157,18 @@ export class ReservasService implements OnModuleInit {
       }),
     );
 
-    return res.rentals || [];
+    return (res.rentals || []).map((rental: any) =>
+      this.normalizarReserva(rental),
+    );
+  }
+
+  private normalizarReserva(reserva: any) {
+    return {
+      ...reserva,
+      estado:
+        typeof reserva.estado === 'string'
+          ? reserva.estado.replace(/^RENTAL_STATUS_/, '')
+          : reserva.estado,
+    };
   }
 }

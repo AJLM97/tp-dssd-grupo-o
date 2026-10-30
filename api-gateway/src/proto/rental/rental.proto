@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package rental;
+
+option java_multiple_files = true;
+option java_package = "com.rentar.rentalservice.grpc";
+option java_outer_classname = "RentalProto";
+
+// Gestión y consulta de alquileres.
+service RentalService {
+  // Crea una reserva (rechaza fechas inválidas o períodos solapados).
+  rpc CreateRental (CreateRentalRequest) returns (CreateRentalResponse);
+  // Lista por cliente, por vehículo o todos (sin filtros).
+  rpc GetRentals (GetRentalsRequest) returns (GetRentalsResponse);
+  // Cancela antes del inicio (customer_id=0 omite la comprobación de propiedad).
+  rpc CancelRental (CancelRentalRequest) returns (CancelRentalResponse);
+  // Devuelve el historial del cliente (canceladas o finalizadas).
+  rpc GetRentalHistory (GetRentalHistoryRequest) returns (GetRentalHistoryResponse);
+}
+
+// Estado de la reserva (las vencidas se informan como FINALIZADA).
+enum RentalStatus {
+  RENTAL_STATUS_UNSPECIFIED = 0;
+  RENTAL_STATUS_CONFIRMADA = 1;
+  RENTAL_STATUS_EN_CURSO = 2;
+  RENTAL_STATUS_FINALIZADA = 3;
+  RENTAL_STATUS_CANCELADA = 4;
+}
+
+// Datos de una reserva (fechas locales, sin zona horaria).
+message RentalData {
+  int64 id = 1;
+  int64 customer_id = 2;
+  int64 vehicle_id = 3;
+  // Formato AAAA-MM-DDTHH:mm:ss.
+  string fecha_inicio = 4;
+  // Mismo formato; posterior al inicio.
+  string fecha_fin = 5;
+  double precio_diario = 6;
+  // precio_diario por cantidad_dias.
+  double importe_total = 7;
+  RentalStatus estado = 8;
+  // Días facturables (redondeo hacia arriba, mínimo uno).
+  int32 cantidad_dias = 9;
+}
+
+// Datos para reservar (IDs y precio positivos; inicio futuro).
+message CreateRentalRequest {
+  int64 customer_id = 1;
+  int64 vehicle_id = 2;
+  // Formato AAAA-MM-DDTHH:mm:ss.
+  string fecha_inicio = 3;
+  // Mismo formato; posterior al inicio.
+  string fecha_fin = 4;
+  // Precio diario (mayor que cero).
+  double precio_diario = 5;
+}
+
+// Filtros de búsqueda (customer_id tiene prioridad).
+message GetRentalsRequest {
+  // 0 omite el filtro.
+  int64 customer_id = 1;
+  // Se usa si customer_id es 0.
+  int64 vehicle_id = 2;
+}
+
+// Reservas encontradas.
+message GetRentalsResponse {
+  repeated RentalData rentals = 1;
+}
+
+// Datos para cancelar una reserva antes de su inicio.
+message CancelRentalRequest {
+  int64 rental_id = 1;
+  // 0 omite la comprobación de propiedad.
+  int64 customer_id = 2;
+}
+
+// Cliente cuyo historial se consultará.
+message GetRentalHistoryRequest {
+  int64 customer_id = 1;
+}
+
+// Reserva creada y confirmada.
+message CreateRentalResponse {
+  RentalData rental = 1;
+}
+
+// Reserva cancelada.
+message CancelRentalResponse {
+  RentalData rental = 1;
+}
+
+// Historial de reservas del cliente.
+message GetRentalHistoryResponse {
+  repeated RentalData rentals = 1;
+}

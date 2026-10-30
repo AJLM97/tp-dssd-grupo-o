@@ -2,12 +2,24 @@ import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { type ClientGrpc } from '@nestjs/microservices';
 import { Observable, lastValueFrom } from 'rxjs';
 
+export interface CustomerData {
+  id: number | string;
+  documento: string;
+  nombre: string;
+  apellido: string;
+  email: string;
+  telefono: string;
+  fechaNacimiento: string;
+  activo: boolean;
+  rol: number | string;
+}
+
 interface CustomerServiceGrpc {
-  createCustomer(data: any): Observable<any>;
-  updateCustomer(data: any): Observable<any>;
-  deleteCustomer(data: { id: number }): Observable<any>;
-  getCustomers(data: { soloActivos: boolean }): Observable<any>;
-  getCustomerById(data: { id: number }): Observable<any>;
+  createCustomer(data: any): Observable<{ customer: CustomerData }>;
+  updateCustomer(data: any): Observable<{ customer: CustomerData }>;
+  deleteCustomer(data: { id: number }): Observable<{ customer: CustomerData }>;
+  getCustomers(data: { soloActivos: boolean }): Observable<{ customers: CustomerData[] }>;
+  getCustomerById(data: { id: number }): Observable<{ customer: CustomerData }>;
   validateCustomer(data: { id: number }): Observable<any>;
 }
 
@@ -22,27 +34,41 @@ export class ClientesService implements OnModuleInit {
   }
 
   async crear(data: any) {
-    return await lastValueFrom(this.customerGrpcService.createCustomer(data));
+    const response = await lastValueFrom(this.customerGrpcService.createCustomer(data));
+    return this.normalizarCliente(response.customer);
   }
 
   async obtenerTodos() {
     const res = await lastValueFrom(this.customerGrpcService.getCustomers({ soloActivos: false }));
-    return res.customers || [];
+    return (res.customers || []).map((customer) => this.normalizarCliente(customer));
   }
 
   async obtenerPorId(id: number) {
-    return await lastValueFrom(this.customerGrpcService.getCustomerById({ id }));
+    const response = await lastValueFrom(this.customerGrpcService.getCustomerById({ id }));
+    return this.normalizarCliente(response.customer);
   }
 
   async actualizar(id: number, data: any) {
-    return await lastValueFrom(this.customerGrpcService.updateCustomer({ id, ...data }));
+    const response = await lastValueFrom(this.customerGrpcService.updateCustomer({ id, ...data }));
+    return this.normalizarCliente(response.customer);
   }
 
   async bajaLogica(id: number) {
-    return await lastValueFrom(this.customerGrpcService.deleteCustomer({ id }));
+    const response = await lastValueFrom(this.customerGrpcService.deleteCustomer({ id }));
+    return this.normalizarCliente(response.customer);
   }
 
   async validar(id: number) {
     return await lastValueFrom(this.customerGrpcService.validateCustomer({ id }));
+  }
+
+  private normalizarCliente(customer: CustomerData): CustomerData {
+    return {
+      ...customer,
+      rol:
+        typeof customer.rol === 'string'
+          ? customer.rol.replace(/^ROLE_/, '')
+          : customer.rol,
+    };
   }
 }
