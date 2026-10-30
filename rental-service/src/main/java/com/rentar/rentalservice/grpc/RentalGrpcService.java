@@ -91,7 +91,8 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
                 .setFechaFin(safeString(rental.getFechaFin() != null ? rental.getFechaFin().toString() : ""))
                 .setPrecioDiario(rental.getPrecioDiario() != null ? rental.getPrecioDiario() : 0.0)
                 .setImporteTotal(rental.getImporteTotal() != null ? rental.getImporteTotal() : 0.0)
-                .setEstado(mapStatusToProto(rental.getEstado()))
+                .setEstado(mapStatusToProto(RentalService.estadoEfectivo(rental)))
+                .setCantidadDias((int) RentalService.calcularDias(rental.getFechaInicio(), rental.getFechaFin()))
                 .build();
     }
 

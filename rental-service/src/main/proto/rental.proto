@@ -30,6 +30,7 @@ message RentalResponse {
   double precio_diario = 6;
   double importe_total = 7;
   RentalStatus estado = 8;
+  int32 cantidad_dias = 9;
 }
 
 message CreateRentalRequest {

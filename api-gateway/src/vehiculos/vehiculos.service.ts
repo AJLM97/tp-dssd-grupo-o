@@ -7,7 +7,7 @@ interface VehicleServiceGrpc {
   createVehicle(data: any): Observable<any>;
   updateVehicle(data: any): Observable<any>;
   deleteVehicle(data: { id: number }): Observable<any>;
-  getVehicles(data: { solo_activos: boolean }): Observable<any>;
+  getVehicles(data: { soloActivos: boolean }): Observable<any>;
   getVehicleById(data: { id: number }): Observable<any>;
   checkAvailability(data: any): Observable<any>;
   updateVehicleStatus(data: any): Observable<any>;
@@ -33,7 +33,7 @@ export class VehiculosService implements OnModuleInit {
   }
 
   async obtenerTodos() {
-    const res = await lastValueFrom(this.vehicleGrpcService.getVehicles({ solo_activos: false }));
+    const res = await lastValueFrom(this.vehicleGrpcService.getVehicles({ soloActivos: false }));
     return res.vehicles || [];
   }
 
@@ -63,7 +63,7 @@ export class VehiculosService implements OnModuleInit {
 
     const [respuestaVehiculos, reservas] = await Promise.all([
       lastValueFrom(
-        this.vehicleGrpcService.getVehicles({ solo_activos: true }),
+        this.vehicleGrpcService.getVehicles({ soloActivos: true }),
       ),
       this.reservasService.buscar({}),
     ]);

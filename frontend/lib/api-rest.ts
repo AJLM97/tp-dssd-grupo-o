@@ -59,8 +59,11 @@ export async function crearVehiculo(
   return resultado;
 }
 
-export async function deleteVehiculoApi(id: number) {
-  const res = await fetch(`${API_URL}/vehiculos/${id}`, { method: "DELETE" });
+export async function deleteVehiculoApi(id: number, accessToken: string) {
+  const res = await fetch(`${API_URL}/vehiculos/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error("Error al dar de baja el vehículo");
   return res.json();
 }
@@ -154,8 +157,11 @@ export async function iniciarSesion(email: string, password: string) {
   } as RespuestaLogin;
 }
 
-export async function deleteClienteApi(id: number) {
-  const res = await fetch(`${API_URL}/clientes/${id}`, { method: "DELETE" });
+export async function deleteClienteApi(id: number, accessToken: string) {
+  const res = await fetch(`${API_URL}/clientes/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error("Error al dar de baja el cliente");
   return res.json();
 }
@@ -163,7 +169,6 @@ export async function deleteClienteApi(id: number) {
 type DatosReserva = {
   clienteId: number | string;
   vehiculoId: number | string;
-  precioDiario: number | string;
   fechaInicio: string;
   fechaFin: string;
 };
@@ -173,7 +178,6 @@ export async function postReserva({
   vehiculoId,
   fechaInicio,
   fechaFin,
-  precioDiario,
 }: DatosReserva) {
   const respuesta = await fetch(`${API_URL}/reservas`, {
     method: "POST",
@@ -181,7 +185,6 @@ export async function postReserva({
     body: JSON.stringify({
       clienteId: Number(clienteId),
       vehiculoId: Number(vehiculoId),
-      precioDiario: Number(precioDiario),
       fechaInicio: new Date(fechaInicio).toISOString().slice(0, 19),
       fechaFin: new Date(fechaFin).toISOString().slice(0, 19),
     }),

@@ -6,7 +6,7 @@ interface CustomerServiceGrpc {
   createCustomer(data: any): Observable<any>;
   updateCustomer(data: any): Observable<any>;
   deleteCustomer(data: { id: number }): Observable<any>;
-  getCustomers(data: { solo_activos: boolean }): Observable<any>;
+  getCustomers(data: { soloActivos: boolean }): Observable<any>;
   getCustomerById(data: { id: number }): Observable<any>;
   validateCustomer(data: { id: number }): Observable<any>;
 }
@@ -26,7 +26,7 @@ export class ClientesService implements OnModuleInit {
   }
 
   async obtenerTodos() {
-    const res = await lastValueFrom(this.customerGrpcService.getCustomers({ solo_activos: false }));
+    const res = await lastValueFrom(this.customerGrpcService.getCustomers({ soloActivos: false }));
     return res.customers || [];
   }
 
@@ -40,5 +40,9 @@ export class ClientesService implements OnModuleInit {
 
   async bajaLogica(id: number) {
     return await lastValueFrom(this.customerGrpcService.deleteCustomer({ id }));
+  }
+
+  async validar(id: number) {
+    return await lastValueFrom(this.customerGrpcService.validateCustomer({ id }));
   }
 }
