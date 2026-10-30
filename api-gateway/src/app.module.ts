@@ -13,6 +13,7 @@ import { AuthModule } from './auth/auth.module';
 import { ReservasModule } from './reservas/reservas.module';
 import { VehiculosModule } from './vehiculos/vehiculos.module';
 import { ClientesModule } from './clientes/clientes.module';
+import { GRPC_LOADER } from './proto/grpc-loader';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ClientesModule } from './clientes/clientes.module';
           package: 'vehicle',
           protoPath: join(process.cwd(), 'src/proto/vehicle.proto'),
           url: process.env.VEHICLE_SERVICE_URL || 'localhost:9091',
+          loader: GRPC_LOADER,
         },
       },
       {
@@ -42,6 +44,7 @@ import { ClientesModule } from './clientes/clientes.module';
           package: 'customer',
           protoPath: join(process.cwd(), 'src/proto/customer.proto'),
           url: process.env.CUSTOMER_SERVICE_URL || 'localhost:9092',
+          loader: GRPC_LOADER,
         },
       },
       {
@@ -51,6 +54,7 @@ import { ClientesModule } from './clientes/clientes.module';
           package: 'rental',
           protoPath: join(process.cwd(), 'src/proto/rental.proto'),
           url: process.env.RENTAL_SERVICE_URL || 'localhost:9093',
+          loader: GRPC_LOADER,
         },
       },
     ]),
