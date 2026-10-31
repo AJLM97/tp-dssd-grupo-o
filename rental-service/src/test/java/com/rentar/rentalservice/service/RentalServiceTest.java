@@ -10,6 +10,7 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -57,8 +59,15 @@ class RentalServiceTest {
                 .build());
 
         assertEquals(MaintenanceStatus.PENDIENTE, rental.getEstadoMantenimiento());
-        verify(eventPublisher).publishEvent(
-                new ReservationConfirmedEvent(150L, 15L, start.toString(), end.toString()));
+        // eventId y fecha cambian en cada evento: se comparan los demas campos
+        ArgumentCaptor<ReservationConfirmedEvent> evento = ArgumentCaptor.forClass(ReservationConfirmedEvent.class);
+        verify(eventPublisher).publishEvent(evento.capture());
+        assertNotNull(evento.getValue().eventId());
+        assertNotNull(evento.getValue().fecha());
+        assertEquals(150L, evento.getValue().reservaId());
+        assertEquals(15L, evento.getValue().vehiculoId());
+        assertEquals(start.toString(), evento.getValue().fechaInicio());
+        assertEquals(end.toString(), evento.getValue().fechaFin());
     }
 
     @Test
