@@ -185,6 +185,10 @@ export class VehiculosService implements OnModuleInit {
         typeof vehicle.estado === 'string'
           ? vehicle.estado.replace(/^VEHICLE_STATUS_/, '')
           : vehicle.estado,
+      verificacion:
+        typeof vehicle.verificacion === 'string'
+          ? vehicle.verificacion.replace(/^VEHICLE_VERIFICATION_/, '')
+          : vehicle.verificacion,
     };
   }
 
