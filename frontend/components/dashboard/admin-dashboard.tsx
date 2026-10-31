@@ -6,6 +6,10 @@ import {
   formatCurrency,
   VEHICLE_STATE_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
+  vehicleStateLabel,
+  vehicleTypeLabel,
+  vehicleVerificationLabel,
+  isVehicleStolen,
 } from "@/lib/rentar-mocks";
 import type {
   Client,
@@ -68,7 +72,7 @@ export function AdminDashboard({
               <Input label="Patente *" value={vehicleForm.licensePlate} disabled={vehicleEditingId !== null} onChange={(event) => setVehicleForm((current) => ({ ...current, licensePlate: event.target.value }))} />
               <Input label="Marca *" value={vehicleForm.brand} onChange={(event) => setVehicleForm((current) => ({ ...current, brand: event.target.value }))} />
               <Input label="Modelo *" value={vehicleForm.model} onChange={(event) => setVehicleForm((current) => ({ ...current, model: event.target.value }))} />
-              <Input label="Anio *" type="number" value={vehicleForm.year} onChange={(event) => setVehicleForm((current) => ({ ...current, year: event.target.value }))} />
+              <Input label="Año *" type="number" value={vehicleForm.year} onChange={(event) => setVehicleForm((current) => ({ ...current, year: event.target.value }))} />
               <Input label="Color" value={vehicleForm.color} onChange={(event) => setVehicleForm((current) => ({ ...current, color: event.target.value }))} />
               <Select label="Tipo *" value={vehicleForm.type} onChange={(event) => setVehicleForm((current) => ({ ...current, type: event.target.value as VehicleType }))}>
                 {VEHICLE_TYPE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -83,7 +87,7 @@ export function AdminDashboard({
               </label>
               <div className="flex gap-2">
                 <button type="submit" className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
-                  {vehicleEditingId ? "Guardar cambios" : "Anadir vehiculo"}
+                  {vehicleEditingId ? "Guardar cambios" : "Añadir vehiculo"}
                 </button>
                 <button type="button" onClick={onClearVehicleForm} className="cursor-pointer rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium">
                   Eliminar carga
@@ -95,19 +99,20 @@ export function AdminDashboard({
           <SectionCard title="Flota de vehículos" description="Consultá y administrá los vehículos de Rentar.">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
-                <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Patente</th><th>Marca/Modelo</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Activo</th><th /></tr></thead>
+                <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Patente</th><th>Marca/Modelo</th><th>Tipo</th><th>Precio</th><th>Estado</th><th>Verificación policial</th><th>Activo</th><th /></tr></thead>
                 <tbody>
                   {vehicles.map((vehicle) => (
                     <tr key={vehicle.id} className="border-b border-zinc-100">
                       <td className="py-2 font-medium">{vehicle.licensePlate}</td>
                       <td>{`${vehicle.brand} ${vehicle.model}`}</td>
-                      <td>{vehicle.type}</td>
+                      <td>{vehicleTypeLabel(vehicle.type)}</td>
                       <td>{formatCurrency(vehicle.dailyPrice)}</td>
-                      <td>{vehicle.state}</td>
+                      <td>{vehicleStateLabel(vehicle.state)}</td>
+                      <td>{vehicleVerificationLabel(vehicle.verification)}</td>
                       <td>{vehicle.active ? "Si" : "No"}</td>
                       <td><div className="flex gap-2">
-                        <button type="button" onClick={() => onStartVehicleEdition(vehicle)} className="rounded bg-zinc-900 px-2 py-1 text-xs text-white">Editar</button>
-                        <button type="button" onClick={() => onVehicleDelete(vehicle.id)} className="rounded border border-zinc-300 px-2 py-1 text-xs">{vehicle.active ? "Baja logica" : "Reactivar"}</button>
+                        <button type="button" onClick={() => onStartVehicleEdition(vehicle)} disabled={isVehicleStolen(vehicle.verification)} className="rounded bg-zinc-900 px-2 py-1 text-xs text-white disabled:cursor-not-allowed disabled:opacity-50">Editar</button>
+                        <button type="button" onClick={() => onVehicleDelete(vehicle.id)} disabled={isVehicleStolen(vehicle.verification)} className="rounded border border-zinc-300 px-2 py-1 text-xs disabled:cursor-not-allowed disabled:opacity-50">{isVehicleStolen(vehicle.verification) ? "No operativo" : vehicle.active ? "Dar de baja" : "Reactivar"}</button>
                       </div></td>
                     </tr>
                   ))}
@@ -165,7 +170,7 @@ export function AdminDashboard({
                       <td>{client.active ? "Si" : "No"}</td>
                       <td><div className="flex gap-2">
                         <button type="button" onClick={() => onStartClientEdition(client)} className="rounded bg-zinc-900 px-2 py-1 text-xs text-white">Editar</button>
-                        <button type="button" onClick={() => onClientDelete(client.id)} className="rounded border border-zinc-300 px-2 py-1 text-xs">{client.active ? "Baja logica" : "Reactivar"}</button>
+                        <button type="button" onClick={() => onClientDelete(client.id)} className="rounded border border-zinc-300 px-2 py-1 text-xs">{client.active ? "Dar de baja" : "Reactivar"}</button>
                       </div></td>
                     </tr>
                   ))}

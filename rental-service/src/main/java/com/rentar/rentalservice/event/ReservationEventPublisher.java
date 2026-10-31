@@ -3,12 +3,15 @@ package com.rentar.rentalservice.event;
 import org.apache.kafka.common.KafkaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
+
+import java.util.Map;
 
 @Component
 public class ReservationEventPublisher {
@@ -26,10 +29,16 @@ public class ReservationEventPublisher {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    @Async
     public void publishReservationConfirmed(ReservationConfirmedEvent event) {
         String payload;
         try {
-            payload = objectMapper.writeValueAsString(event);
+            payload = objectMapper.writeValueAsString(Map.of(
+                    "reserva_id", event.reservaId(),
+                    "vehiculo_id", event.vehiculoId(),
+                    "fecha_inicio", event.fechaInicio(),
+                    "fecha_fin", event.fechaFin()
+            ));
         } catch (JacksonException exception) {
             log.error("No se pudo serializar el evento de reserva confirmada {}", event.reservaId(), exception);
             return;
