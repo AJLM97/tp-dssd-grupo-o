@@ -10,7 +10,7 @@ export type MaintenanceStatus = "PENDIENTE" | "REALIZADO" | "NO_REALIZADO";
 
 export type AppRole = "ADMIN" | "CLIENTE";
 
-export type UiSection = "VEHICULOS" | "CLIENTES" | "DISPONIBILIDAD" | "ALTA_RESERVA" | "RESERVAS" | "HISTORIAL";
+export type UiSection = "VEHICULOS" | "CLIENTES" | "DISPONIBILIDAD" | "ALTA_RESERVA" | "RESERVAS" | "HISTORIAL" | "MIS_VEHICULOS";
 
 export type Vehicle = {
   id: number;

@@ -59,6 +59,60 @@ export async function crearVehiculo(
   return resultado;
 }
 
+// Solicitud de un cliente para sumar su vehículo. Los resultados faltan mientras la validación no respondió
+export type VehiculoExterno = {
+  id: number;
+  patente: string;
+  marca: string;
+  modelo: string;
+  anio: number;
+  color?: string;
+  tipo: string;
+  precioDiario: number;
+  estado: 'PENDIENTE' | 'INCORPORADO' | 'RECHAZADO';
+  resultadoPatente?: 'VALIDADO' | 'RECHAZADO';
+  resultadoTitularidad?: 'VALIDADO' | 'RECHAZADO';
+};
+
+// El cliente no viaja en el body: el gateway lo toma del token
+export async function registrarVehiculoExterno(
+  datos: Parameters<typeof crearVehiculo>[0],
+  token: string,
+): Promise<VehiculoExterno> {
+  const respuesta = await fetch(`${API_URL}/vehiculos/externos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...datos,
+      anio: Number(datos.anio),
+      precioDiario: Number(datos.precioDiario),
+    }),
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    throw new Error(
+      Array.isArray(resultado.message)
+        ? resultado.message.join(', ')
+        : resultado.message || 'No se pudo registrar el vehículo',
+    );
+  }
+
+  return resultado;
+}
+
+export async function fetchMisVehiculosExternos(token: string): Promise<VehiculoExterno[]> {
+  const res = await fetch(`${API_URL}/vehiculos/externos/mios`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Error al obtener tus vehículos');
+  return res.json();
+}
+
 export async function deleteVehiculoApi(id: number, accessToken: string) {
   const res = await fetch(`${API_URL}/vehiculos/${id}`, {
     method: "DELETE",
