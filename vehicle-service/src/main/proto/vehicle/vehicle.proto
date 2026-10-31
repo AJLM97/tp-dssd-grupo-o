@@ -42,6 +42,14 @@ enum VehicleStatus {
   VEHICLE_STATUS_EN_ALQUILER = 3;
 }
 
+// Resultado de la verificación policial, independiente del estado operativo.
+enum VehicleVerification {
+  VEHICLE_VERIFICATION_UNSPECIFIED = 0;
+  VEHICLE_VERIFICATION_PENDIENTE = 1;
+  VEHICLE_VERIFICATION_VALIDADO = 2;
+  VEHICLE_VERIFICATION_ROBADO = 3;
+}
+
 // Datos del vehículo.
 message VehicleData {
   int64 id = 1;
@@ -57,6 +65,8 @@ message VehicleData {
   VehicleStatus estado = 9;
   // false indica baja lógica.
   bool activo = 10;
+  // UNSPECIFIED en los vehículos anteriores al Hito 3.
+  VehicleVerification verificacion = 11;
 }
 
 // Datos para registrar un vehículo.
