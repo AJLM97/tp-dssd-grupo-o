@@ -28,20 +28,20 @@ public class MaintenanceService {
 
     @Transactional
     public MaintenanceRequest procesarReserva(ReservationConfirmedEvent event) {
-        if (event.reserva_id() <= 0 || event.vehiculo_id() <= 0) {
+        if (event.reservaId() <= 0 || event.vehiculoId() <= 0) {
             throw new IllegalArgumentException("La reserva y el vehículo deben tener identificadores válidos");
         }
 
-        LocalDateTime fechaInicio = parsearFecha(event.fecha_inicio(), "fecha_inicio");
-        LocalDateTime fechaFin = parsearFecha(event.fecha_fin(), "fecha_fin");
+        LocalDateTime fechaInicio = parsearFecha(event.fechaInicio(), "fechaInicio");
+        LocalDateTime fechaFin = parsearFecha(event.fechaFin(), "fechaFin");
         if (!fechaFin.isAfter(fechaInicio)) {
-            throw new IllegalArgumentException("La fecha_fin debe ser posterior a fecha_inicio");
+            throw new IllegalArgumentException("La fechaFin debe ser posterior a fechaInicio");
         }
 
-        MaintenanceRequest request = repository.findByReservaId(event.reserva_id())
+        MaintenanceRequest request = repository.findByReservaId(event.reservaId())
                 .orElseGet(() -> nuevaSolicitud(event, fechaInicio, fechaFin));
 
-        if (!request.getVehiculoId().equals(event.vehiculo_id())
+        if (!request.getVehiculoId().equals(event.vehiculoId())
                 || !request.getFechaInicio().equals(fechaInicio)
                 || !request.getFechaFin().equals(fechaFin)) {
             throw new IllegalStateException(
@@ -66,8 +66,8 @@ public class MaintenanceService {
             LocalDateTime fechaInicio,
             LocalDateTime fechaFin) {
         MaintenanceRequest request = new MaintenanceRequest();
-        request.setReservaId(event.reserva_id());
-        request.setVehiculoId(event.vehiculo_id());
+        request.setReservaId(event.reservaId());
+        request.setVehiculoId(event.vehiculoId());
         request.setFechaInicio(fechaInicio);
         request.setFechaFin(fechaFin);
         request.setFechaRegistro(LocalDateTime.now());

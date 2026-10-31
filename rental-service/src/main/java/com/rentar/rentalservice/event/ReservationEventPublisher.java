@@ -11,8 +11,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
-
 @Component
 public class ReservationEventPublisher {
 
@@ -33,12 +31,8 @@ public class ReservationEventPublisher {
     public void publishReservationConfirmed(ReservationConfirmedEvent event) {
         String payload;
         try {
-            payload = objectMapper.writeValueAsString(Map.of(
-                    "reserva_id", event.reservaId(),
-                    "vehiculo_id", event.vehiculoId(),
-                    "fecha_inicio", event.fechaInicio(),
-                    "fecha_fin", event.fechaFin()
-            ));
+            // El record ya tiene los nombres del enunciado (reservaId, vehiculoId, fechaInicio, fechaFin)
+            payload = objectMapper.writeValueAsString(event);
         } catch (JacksonException exception) {
             log.error("No se pudo serializar el evento de reserva confirmada {}", event.reservaId(), exception);
             return;

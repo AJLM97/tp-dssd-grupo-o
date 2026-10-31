@@ -19,6 +19,6 @@ public class ReservationConfirmedListener {
     @KafkaListener(topics = "reserva.confirmada")
     public void recibirReservaConfirmada(ReservationConfirmedEvent event) {
         maintenanceService.procesarReserva(event);
-        log.info("Solicitud de mantenimiento preventivo registrada para la reserva {}", event.reserva_id());
+        log.info("Solicitud de mantenimiento preventivo registrada para la reserva {}", event.reservaId());
     }
 }

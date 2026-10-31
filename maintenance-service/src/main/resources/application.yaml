@@ -12,7 +12,7 @@ spring:
         spring.json.add.type.headers: false
         max.block.ms: 3000
     consumer:
-      group-id: vehicle-service
+      group-id: mantenimiento
       auto-offset-reset: earliest
   datasource:
     url: jdbc:mysql://localhost:3310/maintenance_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true

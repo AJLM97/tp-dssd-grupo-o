@@ -1,8 +1,9 @@
 package com.rentar.maintenanceservice.kafka;
 
+// Campos del enunciado. eventId y fecha tambien llegan, pero no se usan y se ignoran al leer el JSON
 public record ReservationConfirmedEvent(
-        long reserva_id,
-        long vehiculo_id,
-        String fecha_inicio,
-        String fecha_fin) {
+        long reservaId,
+        long vehiculoId,
+        String fechaInicio,
+        String fechaFin) {
 }
