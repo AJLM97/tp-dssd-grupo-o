@@ -8,6 +8,16 @@ grpc:
 spring:
   application:
     name: vehicle-service
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        max.block.ms: 3000
+    consumer:
+      group-id: vehicle-service
+      auto-offset-reset: earliest
   datasource:
     url: jdbc:mysql://localhost:3307/vehicle_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root

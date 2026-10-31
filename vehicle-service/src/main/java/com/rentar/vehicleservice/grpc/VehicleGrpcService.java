@@ -152,7 +152,7 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     private VehicleData toVehicleData(Vehicle vehicle) {
-        return VehicleData.newBuilder()
+        VehicleData.Builder data = VehicleData.newBuilder()
                 .setId(vehicle.getId())
                 .setPatente(vehicle.getPatente())
                 .setMarca(vehicle.getMarca())
@@ -164,8 +164,13 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
                 .setEstado(VehicleStatus.valueOf(
                         "VEHICLE_STATUS_" + vehicle.getEstado().name()))
                 .setTipo(VehicleType.valueOf(
-                        "VEHICLE_TYPE_" + vehicle.getTipo().name()))
-                .build();
+                        "VEHICLE_TYPE_" + vehicle.getTipo().name()));
+        // Los vehiculos anteriores al Hito 3 no tienen verificacion: queda UNSPECIFIED
+        if (vehicle.getVerificacion() != null) {
+            data.setVerificacion(VehicleVerification.valueOf(
+                    "VEHICLE_VERIFICATION_" + vehicle.getVerificacion().name()));
+        }
+        return data.build();
     }
 
     private TipoVehiculo toTipo(VehicleType tipo) {

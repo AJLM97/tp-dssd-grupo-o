@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: verification-service
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: verificacion-policial
+      auto-offset-reset: earliest

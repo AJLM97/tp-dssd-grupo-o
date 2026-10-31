@@ -2,20 +2,27 @@ package com.rentar.vehicleservice.service;
 
 import com.rentar.vehicleservice.entity.EstadoVehiculo;
 import com.rentar.vehicleservice.entity.Vehicle;
+import com.rentar.vehicleservice.entity.VerificacionVehiculo;
+import com.rentar.vehicleservice.kafka.VerificacionSolicitada;
 import com.rentar.vehicleservice.repository.VehicleRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import io.grpc.Status;
 
 import java.util.List;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class VehicleService {
 
     private final VehicleRepository repository;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public VehicleService(VehicleRepository repository) {
+    public VehicleService(VehicleRepository repository, KafkaTemplate<String, Object> kafkaTemplate) {
         this.repository = repository;
+        this.kafkaTemplate = kafkaTemplate;
     }
 
     public Vehicle create(Vehicle vehicle) {
@@ -26,7 +33,16 @@ public class VehicleService {
         if (repository.existsByPatente(vehicle.getPatente())) {
             throw Status.ALREADY_EXISTS.withDescription("Ya existe un vehiculo con esa patente!").asRuntimeException();
         }
-        return repository.save(vehicle);
+        Vehicle creado = repository.save(vehicle);
+        // La verificacion es asincrona: el alta responde sin esperar el resultado. Si Kafka falla, queda PENDIENTE
+        kafkaTemplate.send("vehiculos.verificacion.solicitada", String.valueOf(creado.getId()),
+                        new VerificacionSolicitada(creado.getId(), creado.getPatente()))
+                .whenComplete((resultado, error) -> {
+                    if (error != null) {
+                        log.error("No se pudo publicar la verificacion del vehiculo {}", creado.getId(), error);
+                    }
+                });
+        return creado;
     }
 
     public Vehicle update(long id, Vehicle datos) {
@@ -67,6 +83,20 @@ public class VehicleService {
         Vehicle vehicle = getById(id);
         vehicle.setEstado(nuevoEstado);
         return repository.save(vehicle);
+    }
+
+    // Lo usa el consumidor de vehiculos.verificacion.resultado. Aplicar dos veces el mismo resultado deja el mismo estado
+    public void registrarVerificacion(Long id, VerificacionVehiculo resultado) {
+        if (id == null || resultado == null || resultado == VerificacionVehiculo.PENDIENTE) {
+            throw Status.INVALID_ARGUMENT.withDescription("El resultado de la verificacion no es valido!").asRuntimeException();
+        }
+        Vehicle vehicle = getById(id);
+        vehicle.setVerificacion(resultado);
+        // Robado queda inhabilitado. VALIDADO no lo reactiva, para respetar una baja hecha por el admin
+        if (resultado == VerificacionVehiculo.ROBADO) {
+            vehicle.setActivo(false);
+        }
+        repository.save(vehicle);
     }
 
     private void validar(Vehicle vehicle) {

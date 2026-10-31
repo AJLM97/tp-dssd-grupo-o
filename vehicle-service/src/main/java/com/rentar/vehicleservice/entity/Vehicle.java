@@ -46,5 +46,9 @@ public class Vehicle {
     @Column(nullable = false)
     private  boolean activo = true;
 
+    // Resultado de la verificacion policial: no es un estado operativo. Los vehiculos previos al Hito 3 quedan en null
+    @Enumerated(EnumType.STRING)
+    private VerificacionVehiculo verificacion = VerificacionVehiculo.PENDIENTE;
+
 
 }
