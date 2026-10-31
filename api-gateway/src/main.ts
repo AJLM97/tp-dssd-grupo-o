@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ErroresGrpcInterceptor } from './errores-grpc.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -8,6 +9,8 @@ async function bootstrap() {
   app.enableCors();
 
   app.setGlobalPrefix('api');
+
+  app.useGlobalInterceptors(new ErroresGrpcInterceptor());
 
   const config = new DocumentBuilder()
     .setTitle('API Rentar - Web Services')
