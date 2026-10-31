@@ -13,3 +13,9 @@ spring:
     consumer:
       group-id: verificacion-policial
       auto-offset-reset: earliest
+
+grpc:
+  client:
+    customer-service:
+      address: static://localhost:9092
+      negotiation-type: plaintext
