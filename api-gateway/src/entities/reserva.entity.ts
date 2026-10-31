@@ -2,6 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 't
 import { Cliente } from './cliente.entity';
 import { Vehiculo } from './vehiculo.entity';
 import { EstadoReserva } from '../enums/estado-reserva.enum';
+import { EstadoMantenimiento } from '../enums/estado-mantenimiento.enum';
+import { ApiProperty } from '@nestjs/swagger';
 
 @Entity('reservas')
 export class Reserva {
@@ -34,4 +36,11 @@ export class Reserva {
     default: EstadoReserva.CONFIRMADA,
   })
   estado: EstadoReserva;
+
+  @ApiProperty({
+    enum: EstadoMantenimiento,
+    example: EstadoMantenimiento.PENDIENTE,
+    description: 'Estado del mantenimiento preventivo asociado a la reserva.',
+  })
+  mantenimientoEstado: EstadoMantenimiento;
 }

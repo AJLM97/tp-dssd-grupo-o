@@ -6,6 +6,7 @@ import {
   formatCurrency,
   formatDateTime,
   hasRentalStarted,
+  maintenanceStatusLabel,
   reservationStatusLabel,
   RESERVATION_STATUS_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
@@ -59,7 +60,7 @@ export function ReservationsPanel({
       <SectionCard title="Detalle de reservas" description="Fechas, vehículo, importe y estado de cada reserva.">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Cliente</th><th>Vehiculo</th><th>Patente</th><th>Inicio</th><th>Fin</th><th>Precio diario</th><th>Importe total</th><th>Estado</th><th /></tr></thead>
+            <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Cliente</th><th>Vehiculo</th><th>Patente</th><th>Inicio</th><th>Fin</th><th>Precio diario</th><th>Importe total</th><th>Estado</th><th>Mantenimiento</th><th /></tr></thead>
             <tbody>
               {reservations.map((reservation) => {
                 const client = clients.find((item) => item.id === reservation.clientId);
@@ -72,7 +73,7 @@ export function ReservationsPanel({
   {vehicle
     ? `${vehicle.brand} ${vehicle.model} (${reservation.vehicleType ?? "Tipo desconocido"})`
     : "-"}
-</td><td>{vehicle?.licensePlate ?? "-"}</td><td>{formatDateTime(reservation.startAt)}</td><td>{formatDateTime(reservation.endAt)}</td><td>{formatCurrency(reservation.dailyPrice)}</td><td>{formatCurrency(reservation.totalAmount)}</td><td>{reservationStatusLabel(status)}</td>
+                    </td><td>{vehicle?.licensePlate ?? "-"}</td><td>{formatDateTime(reservation.startAt)}</td><td>{formatDateTime(reservation.endAt)}</td><td>{formatCurrency(reservation.dailyPrice)}</td><td>{formatCurrency(reservation.totalAmount)}</td><td>{reservationStatusLabel(status)}</td><td>{maintenanceStatusLabel(reservation.maintenanceStatus)}</td>
                     <td>{canCancel ? <button type="button" onClick={() => onCancelReservation(reservation.id)} className="rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100">Cancelar reserva</button> : null}</td>
                   </tr>
                 );

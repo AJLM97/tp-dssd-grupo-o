@@ -8,11 +8,17 @@ import {
   registerEnumType,
 } from '@nestjs/graphql';
 import { EstadoReserva } from '../../enums/estado-reserva.enum';
+import { EstadoMantenimiento } from '../../enums/estado-mantenimiento.enum';
 import { TipoVehiculo } from '../../enums/tipo-vehiculo.enum';
 
 registerEnumType(EstadoReserva, {
   name: 'EstadoReserva',
   description: 'Estado actual de una reserva.',
+});
+
+registerEnumType(EstadoMantenimiento, {
+  name: 'EstadoMantenimiento',
+  description: 'Estado del mantenimiento preventivo asociado a una reserva.',
 });
 
 @InputType({
@@ -55,6 +61,28 @@ export class ReservasInput {
       'Fin del rango de fechas. Requiere fechaInicio y debe ser posterior a esta.',
   })
   fechaFin?: Date;
+}
+
+@InputType({ description: 'Datos para crear una reserva.' })
+export class CrearReservaInput {
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Cliente de la reserva. Obligatorio para administradores.',
+  })
+  clienteId?: number;
+
+  @Field(() => Int, { description: 'Identificador del vehículo.' })
+  vehiculoId: number;
+
+  @Field({
+    description: 'Inicio del alquiler en formato AAAA-MM-DDTHH:mm:ss.',
+  })
+  fechaInicio: string;
+
+  @Field({
+    description: 'Fin del alquiler en formato AAAA-MM-DDTHH:mm:ss.',
+  })
+  fechaFin: string;
 }
 
 @ObjectType({ description: 'Datos básicos del cliente que hizo la reserva.' })
@@ -114,6 +142,40 @@ export class ReservaResultado {
 
   @Field(() => EstadoReserva, { description: 'Estado de la reserva.' })
   estado: EstadoReserva;
+
+  @Field(() => EstadoMantenimiento, {
+    description: 'Estado del mantenimiento preventivo asociado a la reserva.',
+  })
+  mantenimientoEstado: EstadoMantenimiento;
+}
+
+@ObjectType({ description: 'Confirmación inmediata de una reserva creada.' })
+export class ReservaCreadaResultado {
+  @Field(() => Int, { description: 'Identificador de la reserva.' })
+  id: number;
+
+  @Field(() => Int, { description: 'Identificador del cliente.' })
+  clienteId: number;
+
+  @Field(() => Int, { description: 'Identificador del vehículo.' })
+  vehiculoId: number;
+
+  @Field(() => GraphQLISODateTime, { description: 'Inicio del alquiler.' })
+  fechaInicio: Date;
+
+  @Field(() => GraphQLISODateTime, { description: 'Fin del alquiler.' })
+  fechaFin: Date;
+
+  @Field(() => Float, { description: 'Importe total del alquiler.' })
+  importeTotal: number;
+
+  @Field(() => EstadoReserva, { description: 'Estado de la reserva.' })
+  estado: EstadoReserva;
+
+  @Field(() => EstadoMantenimiento, {
+    description: 'Estado del mantenimiento preventivo asociado a la reserva.',
+  })
+  mantenimientoEstado: EstadoMantenimiento;
 }
 
 @ObjectType({
@@ -147,4 +209,9 @@ export class HistorialClienteResultado {
       'FINALIZADA o CANCELADA. Una reserva CONFIRMADA o EN_CURSO cuyo período ya terminó se informa como FINALIZADA.',
   })
   estado: EstadoReserva;
+
+  @Field(() => EstadoMantenimiento, {
+    description: 'Estado del mantenimiento preventivo asociado a la reserva.',
+  })
+  mantenimientoEstado: EstadoMantenimiento;
 }

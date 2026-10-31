@@ -9,7 +9,7 @@ spring:
   application:
     name: vehicle-service
   kafka:
-    bootstrap-servers: localhost:29092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
     producer:
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
       properties:

@@ -2,6 +2,7 @@ import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/c
 import { type ClientGrpc } from '@nestjs/microservices';
 import { Observable, lastValueFrom } from 'rxjs';
 import { ClientesService } from '../clientes/clientes.service';
+import { EstadoMantenimiento } from '../enums/estado-mantenimiento.enum';
 
 interface RentalServiceGrpc {
   createRental(data: any): Observable<{ rental: any }>;
@@ -169,6 +170,37 @@ export class ReservasService implements OnModuleInit {
         typeof reserva.estado === 'string'
           ? reserva.estado.replace(/^RENTAL_STATUS_/, '')
           : reserva.estado,
+      mantenimientoEstado: this.normalizarEstadoMantenimiento(
+        reserva.mantenimientoEstado ?? reserva.mantenimiento_estado,
+      ),
     };
+  }
+
+  private normalizarEstadoMantenimiento(estado: unknown): EstadoMantenimiento {
+    if (
+      estado === undefined ||
+      estado === null ||
+      estado === '' ||
+      estado === 0 ||
+      estado === '0' ||
+      estado === 'MAINTENANCE_STATUS_UNSPECIFIED'
+    ) {
+      return EstadoMantenimiento.PENDIENTE;
+    }
+
+    const normalizado =
+      typeof estado === 'string'
+        ? estado.replace(/^MAINTENANCE_STATUS_/, '')
+        : String(estado);
+
+    if (
+      Object.values(EstadoMantenimiento).includes(
+        normalizado as EstadoMantenimiento,
+      )
+    ) {
+      return normalizado as EstadoMantenimiento;
+    }
+
+    throw new Error(`Estado de mantenimiento gRPC desconocido: ${String(estado)}`);
   }
 }

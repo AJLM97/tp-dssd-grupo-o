@@ -14,10 +14,32 @@ type ClienteReserva {
   nombre: String!
 }
 
+"""Datos para crear una reserva."""
+input CrearReservaInput {
+  """Cliente de la reserva. Obligatorio para administradores."""
+  clienteId: Int
+
+  """Fin del alquiler en formato AAAA-MM-DDTHH:mm:ss."""
+  fechaFin: String!
+
+  """Inicio del alquiler en formato AAAA-MM-DDTHH:mm:ss."""
+  fechaInicio: String!
+
+  """Identificador del vehículo."""
+  vehiculoId: Int!
+}
+
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
 scalar DateTime
+
+"""Estado del mantenimiento preventivo asociado a una reserva."""
+enum EstadoMantenimiento {
+  NO_REALIZADO
+  PENDIENTE
+  REALIZADO
+}
 
 """Estado actual de una reserva."""
 enum EstadoReserva {
@@ -51,8 +73,18 @@ type HistorialClienteResultado {
   """Importe total del alquiler."""
   importeTotal: Float!
 
+  """Estado del mantenimiento preventivo asociado a la reserva."""
+  mantenimientoEstado: EstadoMantenimiento!
+
   """Vehículo alquilado."""
   vehiculo: VehiculoReserva!
+}
+
+type Mutation {
+  """
+  Crea una reserva y devuelve su confirmación sin esperar el mantenimiento preventivo.
+  """
+  crearReserva(input: CrearReservaInput!): ReservaCreadaResultado!
 }
 
 type Query {
@@ -75,6 +107,33 @@ type Query {
   vehiculosDisponibles(filtros: VehiculosDisponiblesInput!): [VehiculoDisponible!]!
 }
 
+"""Confirmación inmediata de una reserva creada."""
+type ReservaCreadaResultado {
+  """Identificador del cliente."""
+  clienteId: Int!
+
+  """Estado de la reserva."""
+  estado: EstadoReserva!
+
+  """Fin del alquiler."""
+  fechaFin: DateTime!
+
+  """Inicio del alquiler."""
+  fechaInicio: DateTime!
+
+  """Identificador de la reserva."""
+  id: Int!
+
+  """Importe total del alquiler."""
+  importeTotal: Float!
+
+  """Estado del mantenimiento preventivo asociado a la reserva."""
+  mantenimientoEstado: EstadoMantenimiento!
+
+  """Identificador del vehículo."""
+  vehiculoId: Int!
+}
+
 """Reserva con su cliente y su vehículo."""
 type ReservaResultado {
   """Cliente que hizo la reserva."""
@@ -94,6 +153,9 @@ type ReservaResultado {
 
   """Importe total del alquiler."""
   importeTotal: Float!
+
+  """Estado del mantenimiento preventivo asociado a la reserva."""
+  mantenimientoEstado: EstadoMantenimiento!
 
   """Precio diario registrado en la reserva."""
   precioDiario: Float!

@@ -22,6 +22,8 @@ import {
 import {
   createEmptyClient,
   createEmptyVehicle,
+  isVehicleStolen,
+  isVehicleVerificationPending,
   normalizeDate,
   overlaps,
   calculateDays,
@@ -41,10 +43,12 @@ import type {
   AppRole,
   Client,
   ClientForm,
+  MaintenanceStatus,
   Reservation,
   UiSection,
   Vehicle,
   VehicleForm,
+  VehicleVerification,
 } from "@/lib/rentar-types";
 import { OwnReservationsPanel } from "./own-reservations-panel";
 
@@ -95,6 +99,80 @@ function normalizarId(id: unknown): number {
   return resultado;
 }
 
+function normalizarEstadoMantenimiento(estado: unknown): MaintenanceStatus {
+  if (
+    estado === undefined ||
+    estado === null ||
+    estado === "" ||
+    estado === 0 ||
+    estado === "0" ||
+    estado === "MAINTENANCE_STATUS_UNSPECIFIED"
+  ) {
+    return "PENDIENTE";
+  }
+
+  const normalizado =
+    typeof estado === "string"
+      ? estado.replace(/^MAINTENANCE_STATUS_/, "")
+      : String(estado);
+
+  if (
+    normalizado === "PENDIENTE" ||
+    normalizado === "REALIZADO" ||
+    normalizado === "NO_REALIZADO"
+  ) {
+    return normalizado;
+  }
+
+  throw new Error(`El backend devolvió un estado de mantenimiento inválido: ${String(estado)}`);
+}
+
+type VehicleApiRecord = {
+  id: unknown;
+  patente?: string;
+  licensePlate?: string;
+  marca?: string;
+  brand?: string;
+  modelo?: string;
+  model?: string;
+  anio?: number;
+  year?: number;
+  color?: string;
+  tipo?: Vehicle["type"];
+  type?: Vehicle["type"];
+  precioDiario?: number | string;
+  dailyPrice?: number | string;
+  estado?: Vehicle["state"];
+  state?: Vehicle["state"];
+  activo?: boolean;
+  active?: boolean;
+  verificacion?: VehicleVerification | number | null;
+  verification?: VehicleVerification | number | null;
+};
+
+function mapVehicleRecord(vehicle: VehicleApiRecord): Vehicle {
+  const type = vehicle.tipo ?? vehicle.type;
+  const state = vehicle.estado ?? vehicle.state;
+
+  if (!type || !state) {
+    throw new Error("El servicio devolvió un vehículo sin tipo o estado.");
+  }
+
+  return {
+    id: normalizarId(vehicle.id),
+    licensePlate: vehicle.patente ?? vehicle.licensePlate ?? "",
+    brand: vehicle.marca ?? vehicle.brand ?? "",
+    model: vehicle.modelo ?? vehicle.model ?? "",
+    year: vehicle.anio ?? vehicle.year ?? 0,
+    color: vehicle.color ?? "",
+    type,
+    dailyPrice: Number(vehicle.precioDiario ?? vehicle.dailyPrice ?? 0),
+    state,
+    active: vehicle.activo ?? vehicle.active ?? false,
+    verification: vehicle.verificacion ?? vehicle.verification ?? null,
+  };
+}
+
 export default function DashboardWorkspace({ role }: { role: AppRole }) {
   const isLoggingOut = useRef(false);
   const [section, setSection] = useState<UiSection>(role === "ADMIN" ? "VEHICULOS" : "DISPONIBILIDAD");
@@ -116,18 +194,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
         fetchClientes(),
       ]);
 
-      const mappedVehicles = vehData.map((v: any) => ({
-        id: normalizarId(v.id),
-        licensePlate: v.patente || v.licensePlate,
-        brand: v.marca || v.brand,
-        model: v.modelo || v.model,
-        year: v.anio || v.year,
-        color: v.color || "",
-        type: v.tipo || v.type,
-        dailyPrice: Number(v.precioDiario || v.dailyPrice),
-        state: v.estado || v.state,
-        active: v.activo !== undefined ? v.activo : v.active,
-      }));
+      const mappedVehicles = (vehData as VehicleApiRecord[]).map(mapVehicleRecord);
 
       const mappedClients = cliData.map((c: any) => ({
         id: normalizarId(c.id),
@@ -173,6 +240,44 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
   const [reservationStartAt, setReservationStartAt] = useState("");
   const [reservationEndAt, setReservationEndAt] = useState("");
   const [feedback, setFeedback] = useState("");
+
+  const hasPendingVehicleVerification = vehicles.some((vehicle) =>
+    isVehicleVerificationPending(vehicle.verification),
+  );
+
+  useEffect(() => {
+    if (!hasPendingVehicleVerification) {
+      return;
+    }
+
+    let active = true;
+    let timeout: ReturnType<typeof setTimeout>;
+
+    async function refreshPendingVerifications() {
+      try {
+        const data = (await fetchVehiculos()) as VehicleApiRecord[];
+        if (!active) return;
+
+        const updatedVehicles = data.map(mapVehicleRecord);
+        setVehicles(updatedVehicles);
+
+        if (updatedVehicles.some((vehicle) => isVehicleVerificationPending(vehicle.verification))) {
+          timeout = setTimeout(refreshPendingVerifications, 2000);
+        }
+      } catch (error) {
+        console.error("No se pudieron actualizar las verificaciones de vehículos:", error);
+        if (active) {
+          timeout = setTimeout(refreshPendingVerifications, 5000);
+        }
+      }
+    }
+
+    timeout = setTimeout(refreshPendingVerifications, 2000);
+    return () => {
+      active = false;
+      clearTimeout(timeout);
+    };
+  }, [hasPendingVehicleVerification]);
 
   const currentClient = useMemo(() => clients.find((client) => client.id === currentClientId) ?? null, [clients, currentClientId]);
 
@@ -264,6 +369,9 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
   }, [availabilityFilters]);
 
   useEffect(() => {
+    let active = true;
+    let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+
     async function cargarReservasGraphQL() {
       if (section !== "RESERVAS") return;
 
@@ -303,6 +411,8 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
           fetchPolicy: "network-only",
         });
 
+        if (!active) return;
+
         const data = response.data as { reservas: any[] };
 
         const mappedReservations = data.reservas.map((r: any) => ({
@@ -315,15 +425,23 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
           dailyPrice: Number(r.precioDiario),
           totalAmount: Number(r.importeTotal),
           status: r.estado,
+          maintenanceStatus: normalizarEstadoMantenimiento(r.mantenimientoEstado),
         }));
 
         setReservations(mappedReservations);
+        if (mappedReservations.some((reservation) => reservation.maintenanceStatus === "PENDIENTE")) {
+          refreshTimeout = setTimeout(cargarReservasGraphQL, 3000);
+        }
       } catch (err: any) {
         console.error("Error al cargar reservas vía GraphQL:", err.message);
       }
     }
 
     cargarReservasGraphQL();
+    return () => {
+      active = false;
+      clearTimeout(refreshTimeout);
+    };
   }, [section, reservationFilters, role]);
 
   const reservationPreview = useMemo(() => {
@@ -400,7 +518,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       }
       await reloadData();
       clearVehicleForm();
-      setFeedback(vehicleEditingId ? "Vehículo actualizado en el backend." : "Vehículo añadido correctamente.");
+      setFeedback(vehicleEditingId ? "Vehículo actualizado correctamente." : "Vehículo registrado. La verificación policial está en curso.");
     } catch (err: any) {
       setFeedback(err.message);
     }
@@ -439,7 +557,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       );
       await reloadData();
       clearClientForm();
-      setFeedback(clientEditingId ? "Cliente actualizado en el backend." : "Cliente añadido correctamente.");
+      setFeedback(clientEditingId ? "Cliente actualizado correctamente." : "Cliente añadido correctamente.");
     } catch (err: any) {
       setFeedback(err.message);
     }
@@ -449,7 +567,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
     try {
       await deleteVehiculoApi(id, obtenerToken());
       await reloadData();
-      setFeedback("Baja lógica de vehículo realizada.");
+      setFeedback("Vehículo dado de baja correctamente.");
     } catch (err: any) {
       setFeedback(err.message);
     }
@@ -459,7 +577,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
     try {
       await deleteClienteApi(id, obtenerToken());
       await reloadData();
-      setFeedback("Baja lógica de cliente realizada.");
+      setFeedback("Cliente dado de baja correctamente.");
     } catch (err: any) {
       setFeedback(err.message);
     }
@@ -514,6 +632,8 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
       clienteId === undefined ||
       clienteId <= 0 ||
       !vehiculoSeleccionado ||
+      !vehiculoSeleccionado.active ||
+      isVehicleStolen(vehiculoSeleccionado.verification) ||
       vehiculoSeleccionado.dailyPrice <= 0 ||
       !reservationStartAt ||
       !reservationEndAt
@@ -523,18 +643,39 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
     }
 
     try {
-      await postReserva({
+      const reservaCreada = await postReserva({
         clienteId,
         vehiculoId: vehiculoSeleccionado.id,
         fechaInicio: reservationStartAt,
         fechaFin: reservationEndAt,
       });
 
-      await reloadData();
+      const nuevaReserva: Reservation = {
+        id: normalizarId(reservaCreada.id),
+        clientId: normalizarId(reservaCreada.customerId ?? reservaCreada.customer_id ?? clienteId),
+        vehicleId: normalizarId(reservaCreada.vehicleId ?? reservaCreada.vehicle_id ?? vehiculoSeleccionado.id),
+        vehicleType: vehiculoSeleccionado.type,
+        startAt: reservaCreada.fechaInicio ?? reservaCreada.fecha_inicio ?? reservationStartAt,
+        endAt: reservaCreada.fechaFin ?? reservaCreada.fecha_fin ?? reservationEndAt,
+        dailyPrice: Number(reservaCreada.precioDiario ?? reservaCreada.precio_diario ?? vehiculoSeleccionado.dailyPrice),
+        totalAmount: Number(reservaCreada.importeTotal ?? reservaCreada.importe_total ?? reservationPreview?.total ?? 0),
+        status: "CONFIRMADA",
+        maintenanceStatus: normalizarEstadoMantenimiento(
+          reservaCreada.mantenimientoEstado ?? reservaCreada.mantenimiento_estado,
+        ),
+      };
+      setReservations((actuales) => [
+        nuevaReserva,
+        ...actuales.filter((reserva) => reserva.id !== nuevaReserva.id),
+      ]);
       setSelectedVehicleId(null);
       setReservationStartAt("");
       setReservationEndAt("");
-      setFeedback("Reserva confirmada e ingresada en el backend.");
+      setFeedback(
+        "¡Tu reserva está confirmada! Estamos revisando el vehículo para que puedas disfrutar tu viaje.",
+      );
+      setSection("RESERVAS");
+      void reloadData();
     } catch (err: any) {
       setFeedback(err.message);
     }
@@ -549,7 +690,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
         actuales.filter((reserva) => reserva.id !== reservationId),
       );
       await reloadData();
-      setFeedback("Reserva cancelada en el backend.");
+      setFeedback("Reserva cancelada correctamente.");
     } catch (err: any) {
       setFeedback(err.message);
     }
@@ -576,6 +717,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
             dailyPrice: Number(reserva.precioDiario ?? 0),
             totalAmount: Number(reserva.importeTotal),
             status: reserva.estado,
+            maintenanceStatus: normalizarEstadoMantenimiento(reserva.mantenimientoEstado),
           })),
         );
       } catch (err: any) {
