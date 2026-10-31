@@ -2,11 +2,15 @@ package com.rentar.rentalservice.service;
 
 import com.rentar.rentalservice.entity.Rental;
 import com.rentar.rentalservice.entity.RentalStatus;
+import com.rentar.rentalservice.entity.MaintenanceStatus;
 import com.rentar.rentalservice.grpc.CancelRentalRequest;
 import com.rentar.rentalservice.grpc.CreateRentalRequest;
+import com.rentar.rentalservice.event.MaintenanceResultEvent;
+import com.rentar.rentalservice.event.ReservationConfirmedEvent;
 import com.rentar.rentalservice.repository.RentalRepository;
 
 import io.grpc.Status;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,9 +24,11 @@ import java.util.List;
 public class RentalService {
 
     private final RentalRepository repository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public RentalService(RentalRepository repository) {
+    public RentalService(RentalRepository repository, ApplicationEventPublisher eventPublisher) {
         this.repository = repository;
+        this.eventPublisher = eventPublisher;
     }
 
     public Rental create(CreateRentalRequest request) {
@@ -63,8 +69,45 @@ public class RentalService {
         rental.setPrecioDiario(precioDiario);
         rental.setImporteTotal(importeTotal);
         rental.setEstado(RentalStatus.CONFIRMADA);
+        rental.setEstadoMantenimiento(MaintenanceStatus.PENDIENTE);
 
-        return repository.saveAndFlush(rental);
+        Rental savedRental = repository.saveAndFlush(rental);
+        eventPublisher.publishEvent(new ReservationConfirmedEvent(
+                savedRental.getId(),
+                savedRental.getVehicleId(),
+                savedRental.getFechaInicio().toString(),
+                savedRental.getFechaFin().toString()
+        ));
+        return savedRental;
+    }
+
+    public void recordMaintenanceResult(MaintenanceResultEvent event) {
+        long rentalId = validateId(event.reservaId(), "reservaId");
+        long vehicleId = validateId(event.vehiculoId(), "vehiculoId");
+        MaintenanceStatus result = switch (event.resultado() == null ? "" : event.resultado()) {
+            case "REALIZADO" -> MaintenanceStatus.REALIZADO;
+            case "NO_REALIZADO" -> MaintenanceStatus.NO_REALIZADO;
+            default -> throw invalid("El resultado del mantenimiento debe ser REALIZADO o NO_REALIZADO");
+        };
+
+        Rental rental = getById(rentalId);
+        if (!rental.getVehicleId().equals(vehicleId)) {
+            throw Status.FAILED_PRECONDITION
+                    .withDescription("El vehículo del resultado no coincide con el de la reserva")
+                    .asRuntimeException();
+        }
+
+        MaintenanceStatus currentStatus = rental.getEstadoMantenimiento();
+        if (currentStatus != null
+                && currentStatus != MaintenanceStatus.PENDIENTE
+                && currentStatus != result) {
+            throw Status.FAILED_PRECONDITION
+                    .withDescription("La reserva ya tiene un resultado de mantenimiento diferente")
+                    .asRuntimeException();
+        }
+
+        rental.setEstadoMantenimiento(result);
+        repository.saveAndFlush(rental);
     }
 
     public Rental cancel(CancelRentalRequest request) {

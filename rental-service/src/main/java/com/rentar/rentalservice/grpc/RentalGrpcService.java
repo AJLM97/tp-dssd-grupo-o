@@ -2,6 +2,7 @@ package com.rentar.rentalservice.grpc;
 
 import com.rentar.rentalservice.entity.RentalStatus;
 import com.rentar.rentalservice.entity.Rental;
+import com.rentar.rentalservice.entity.MaintenanceStatus;
 import com.rentar.rentalservice.service.RentalService;
 
 import io.grpc.Status;
@@ -98,6 +99,7 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
                 .setImporteTotal(rental.getImporteTotal() != null ? rental.getImporteTotal() : 0.0)
                 .setEstado(mapStatusToProto(RentalService.estadoEfectivo(rental)))
                 .setCantidadDias((int) RentalService.calcularDias(rental.getFechaInicio(), rental.getFechaFin()))
+                .setMantenimientoEstado(mapMaintenanceStatusToProto(rental.getEstadoMantenimiento()))
                 .build();
     }
 
@@ -111,6 +113,19 @@ public class RentalGrpcService extends RentalServiceGrpc.RentalServiceImplBase {
             case EN_CURSO -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_EN_CURSO;
             case FINALIZADA -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_FINALIZADA;
             case CANCELADA -> com.rentar.rentalservice.grpc.RentalStatus.RENTAL_STATUS_CANCELADA;
+        };
+    }
+
+    private com.rentar.rentalservice.grpc.MaintenanceStatus mapMaintenanceStatusToProto(
+            MaintenanceStatus status) {
+        if (status == null) {
+            return com.rentar.rentalservice.grpc.MaintenanceStatus.MAINTENANCE_STATUS_UNSPECIFIED;
+        }
+
+        return switch (status) {
+            case PENDIENTE -> com.rentar.rentalservice.grpc.MaintenanceStatus.MAINTENANCE_STATUS_PENDIENTE;
+            case REALIZADO -> com.rentar.rentalservice.grpc.MaintenanceStatus.MAINTENANCE_STATUS_REALIZADO;
+            case NO_REALIZADO -> com.rentar.rentalservice.grpc.MaintenanceStatus.MAINTENANCE_STATUS_NO_REALIZADO;
         };
     }
 

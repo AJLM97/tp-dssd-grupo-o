@@ -39,4 +39,8 @@ public class Rental {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RentalStatus estado;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mantenimiento_estado")
+    private MaintenanceStatus estadoMantenimiento;
 }
