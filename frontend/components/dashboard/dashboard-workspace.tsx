@@ -51,6 +51,7 @@ import type {
   VehicleVerification,
 } from "@/lib/rentar-types";
 import { OwnReservationsPanel } from "./own-reservations-panel";
+import { ExternalVehiclesPanel } from "./external-vehicles-panel";
 
 const SECTION_LABELS: Record<UiSection, string> = {
   VEHICULOS: "Flota",
@@ -59,6 +60,7 @@ const SECTION_LABELS: Record<UiSection, string> = {
   ALTA_RESERVA: "Nueva reserva",
   RESERVAS: "Reservas",
   HISTORIAL: "Mi historial",
+  MIS_VEHICULOS: "Mis vehículos",
 };
 
 // Devuelve el token del login guardado; sin sesión, el error lo muestra el catch de quien la llama
@@ -464,7 +466,7 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
   const activeSections: UiSection[] =
     role === "ADMIN"
       ? ["VEHICULOS", "CLIENTES", "RESERVAS"]
-      : ["DISPONIBILIDAD", "ALTA_RESERVA", "RESERVAS", "HISTORIAL"];
+      : ["DISPONIBILIDAD", "ALTA_RESERVA", "RESERVAS", "HISTORIAL", "MIS_VEHICULOS"];
 
   function clearVehicleForm() {
     setVehicleForm(createEmptyVehicle());
@@ -790,6 +792,8 @@ export default function DashboardWorkspace({ role }: { role: AppRole }) {
               onCancelReservation={handleCancelReservation}
             />
           )
+        ) : section === "MIS_VEHICULOS" ? (
+          <ExternalVehiclesPanel obtenerToken={obtenerToken} />
         ) : role === "ADMIN" ? (
           <AdminDashboard
             section={section}

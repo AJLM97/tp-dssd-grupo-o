@@ -26,11 +26,24 @@ public class VerificacionPolicialListener {
     @KafkaListener(topics = "vehiculos.verificacion.solicitada")
     public void verificar(VerificacionSolicitada solicitud) throws InterruptedException {
         Thread.sleep(DEMORA_MS);
-        boolean robado = solicitud.patente() != null && PATENTES_ROBADAS.contains(solicitud.patente().toUpperCase());
-        String resultado = robado ? "ROBADO" : "VALIDADO";
+        String resultado = esRobada(solicitud.patente()) ? "ROBADO" : "VALIDADO";
         // join espera la confirmacion de Kafka: si falla, se reintenta y la solicitud no se pierde
         kafkaTemplate.send("vehiculos.verificacion.resultado", String.valueOf(solicitud.vehiculoId()),
                 new VerificacionResultado(solicitud.vehiculoId(), solicitud.patente(), resultado)).join();
         log.info("Patente {} verificada: {}", solicitud.patente(), resultado);
+    }
+
+    // Mismo registro y mismo grupo, pero para un vehiculo externo el enunciado pide RECHAZADO en vez de ROBADO
+    @KafkaListener(topics = "vehiculos.externos.registrados")
+    public void verificarExterno(VehiculoExternoRegistrado solicitud) throws InterruptedException {
+        Thread.sleep(DEMORA_MS);
+        String resultado = esRobada(solicitud.patente()) ? "RECHAZADO" : "VALIDADO";
+        kafkaTemplate.send("vehiculos.externos.validacion.patente", String.valueOf(solicitud.vehiculoExternoId()),
+                new ValidacionPatente(solicitud.vehiculoExternoId(), solicitud.patente(), resultado)).join();
+        log.info("Patente externa {} verificada: {}", solicitud.patente(), resultado);
+    }
+
+    private boolean esRobada(String patente) {
+        return patente != null && PATENTES_ROBADAS.contains(patente.toUpperCase());
     }
 }

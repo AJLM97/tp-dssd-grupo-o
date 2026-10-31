@@ -12,6 +12,10 @@ interface VehicleServiceGrpc {
   getVehicleById(data: { id: number }): Observable<{ vehicle: any }>;
   checkAvailability(data: any): Observable<any>;
   updateVehicleStatus(data: any): Observable<{ vehicle: any }>;
+  registerExternalVehicle(data: any): Observable<{ externalVehicle: any }>;
+  getExternalVehicles(data: {
+    clienteId: number;
+  }): Observable<{ externalVehicles: any[] }>;
   checkAvailability(data: {
     vehicleId: number;
     fechaInicio: string;
@@ -59,6 +63,26 @@ export class VehiculosService implements OnModuleInit {
   async bajaLogica(id: number) {
     const response = await lastValueFrom(this.vehicleGrpcService.deleteVehicle({ id }));
     return this.normalizarVehiculo(response.vehicle);
+  }
+
+  async registrarExterno(clienteId: number, data: any) {
+    // clienteId va al final para que un valor del body no lo pise
+    const response = await lastValueFrom(
+      this.vehicleGrpcService.registerExternalVehicle({
+        ...this.prepararVehiculo(data),
+        clienteId,
+      }),
+    );
+    return this.normalizarExterno(response.externalVehicle);
+  }
+
+  async obtenerExternosDeCliente(clienteId: number) {
+    const res = await lastValueFrom(
+      this.vehicleGrpcService.getExternalVehicles({ clienteId }),
+    );
+    return (res.externalVehicles || []).map((solicitud) =>
+      this.normalizarExterno(solicitud),
+    );
   }
 
   async buscarDisponibles(filtros: any) {
@@ -190,6 +214,27 @@ export class VehiculosService implements OnModuleInit {
           ? vehicle.verificacion.replace(/^VEHICLE_VERIFICATION_/, '')
           : vehicle.verificacion,
     };
+  }
+
+  // Las validaciones que todavía no respondieron no vienen en la respuesta (quedan undefined)
+  private normalizarExterno(solicitud: any) {
+    return {
+      ...solicitud,
+      tipo: this.normalizarTipo(solicitud.tipo),
+      estado: this.quitarPrefijo(solicitud.estado, 'EXTERNAL_VEHICLE_STATUS_'),
+      resultadoPatente: this.quitarPrefijo(
+        solicitud.resultadoPatente,
+        'EXTERNAL_VALIDATION_RESULT_',
+      ),
+      resultadoTitularidad: this.quitarPrefijo(
+        solicitud.resultadoTitularidad,
+        'EXTERNAL_VALIDATION_RESULT_',
+      ),
+    };
+  }
+
+  private quitarPrefijo(valor: unknown, prefijo: string) {
+    return typeof valor === 'string' ? valor.replace(prefijo, '') : valor;
   }
 
   private normalizarTipo(tipo: number | string): TipoVehiculo {

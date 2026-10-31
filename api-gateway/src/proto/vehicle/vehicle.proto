@@ -22,6 +22,10 @@ service VehicleService {
   rpc CheckAvailability (CheckAvailabilityRequest) returns (CheckAvailabilityResponse);
   // Cambia el estado operativo del vehículo.
   rpc UpdateVehicleStatus (UpdateVehicleStatusRequest) returns (UpdateVehicleStatusResponse);
+  // Registra la solicitud de un cliente para sumar su vehículo (queda PENDIENTE hasta que terminan las validaciones).
+  rpc RegisterExternalVehicle (RegisterExternalVehicleRequest) returns (RegisterExternalVehicleResponse);
+  // Lista las solicitudes de vehículos externos de un cliente.
+  rpc GetExternalVehicles (GetExternalVehiclesRequest) returns (GetExternalVehiclesResponse);
 }
 
 // Tipo de vehículo.
@@ -50,6 +54,21 @@ enum VehicleVerification {
   VEHICLE_VERIFICATION_ROBADO = 3;
 }
 
+// Estado de la solicitud de un vehículo externo.
+enum ExternalVehicleStatus {
+  EXTERNAL_VEHICLE_STATUS_UNSPECIFIED = 0;
+  EXTERNAL_VEHICLE_STATUS_PENDIENTE = 1;
+  EXTERNAL_VEHICLE_STATUS_INCORPORADO = 2;
+  EXTERNAL_VEHICLE_STATUS_RECHAZADO = 3;
+}
+
+// Resultado de cada validación de un vehículo externo.
+enum ExternalValidationResult {
+  EXTERNAL_VALIDATION_RESULT_UNSPECIFIED = 0;
+  EXTERNAL_VALIDATION_RESULT_VALIDADO = 1;
+  EXTERNAL_VALIDATION_RESULT_RECHAZADO = 2;
+}
+
 // Datos del vehículo.
 message VehicleData {
   int64 id = 1;
@@ -66,6 +85,27 @@ message VehicleData {
   bool activo = 10;
   // Verificación policial (UNSPECIFIED en los vehículos anteriores al Hito 3).
   VehicleVerification verificacion = 11;
+}
+
+// Solicitud de un cliente para sumar su vehículo.
+message ExternalVehicleData {
+  int64 id = 1;
+  int64 cliente_id = 2;
+  string patente = 3;
+  string marca = 4;
+  string modelo = 5;
+  int32 anio = 6;
+  string color = 7;
+  VehicleType tipo = 8;
+  // Precio diario.
+  double precio_diario = 9;
+  ExternalVehicleStatus estado = 10;
+  // Validación policial (UNSPECIFIED mientras no llega el resultado).
+  ExternalValidationResult resultado_patente = 11;
+  // Validación de titularidad (UNSPECIFIED mientras no llega el resultado).
+  ExternalValidationResult resultado_titularidad = 12;
+  // Vehículo creado al incorporarse (0 mientras no se incorpora).
+  int64 vehicle_id = 13;
 }
 
 // Datos para registrar un vehículo.
@@ -140,6 +180,27 @@ message UpdateVehicleStatusRequest {
   VehicleStatus nuevo_estado = 2;
 }
 
+// Datos del vehículo que un cliente quiere sumar.
+message RegisterExternalVehicleRequest {
+  // Cliente que lo registra (el gateway lo toma del token).
+  int64 cliente_id = 1;
+  string patente = 2;
+  string marca = 3;
+  string modelo = 4;
+  // Año (mayor que cero).
+  int32 anio = 5;
+  string color = 6;
+  // Tipo (no puede ser UNSPECIFIED).
+  VehicleType tipo = 7;
+  // Precio diario (mayor que cero).
+  double precio_diario = 8;
+}
+
+// Cliente cuyas solicitudes se consultarán.
+message GetExternalVehiclesRequest {
+  int64 cliente_id = 1;
+}
+
 // Vehículo creado.
 message CreateVehicleResponse {
   // Estado inicial  (activo y DISPONIBLE).
@@ -164,4 +225,16 @@ message GetVehicleByIdResponse {
 // Vehículo con el estado actualizado.
 message UpdateVehicleStatusResponse {
   VehicleData vehicle = 1;
+}
+
+// Solicitud registrada.
+message RegisterExternalVehicleResponse {
+  // Estado inicial (PENDIENTE).
+  ExternalVehicleData external_vehicle = 1;
+}
+
+// Solicitudes encontradas.
+message GetExternalVehiclesResponse {
+  // Puede estar vacío.
+  repeated ExternalVehicleData external_vehicles = 1;
 }

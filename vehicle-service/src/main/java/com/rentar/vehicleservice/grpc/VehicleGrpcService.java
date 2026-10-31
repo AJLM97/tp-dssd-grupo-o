@@ -3,6 +3,7 @@ package com.rentar.vehicleservice.grpc;
 import com.rentar.vehicleservice.entity.EstadoVehiculo;
 import com.rentar.vehicleservice.entity.TipoVehiculo;
 import com.rentar.vehicleservice.entity.Vehicle;
+import com.rentar.vehicleservice.entity.VehiculoExterno;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -149,6 +150,73 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
         }
+    }
+
+    @Override
+    public void registerExternalVehicle(RegisterExternalVehicleRequest request, StreamObserver<RegisterExternalVehicleResponse> responseObserver) {
+
+        try {
+            Vehicle datos = new Vehicle();
+            datos.setPatente(request.getPatente().trim());
+            datos.setMarca(request.getMarca().trim());
+            datos.setModelo(request.getModelo().trim());
+            datos.setAnio(request.getAnio());
+            datos.setColor(request.getColor().isBlank() ? null : request.getColor().trim());
+            datos.setTipo(toTipo(request.getTipo()));
+            datos.setPrecioDiario(request.getPrecioDiario());
+
+            VehiculoExterno solicitud = vehicleService.registrarExterno(request.getClienteId(), datos);
+            responseObserver.onNext(RegisterExternalVehicleResponse.newBuilder()
+                    .setExternalVehicle(toExternalVehicleData(solicitud))
+                    .build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void getExternalVehicles(GetExternalVehiclesRequest request, StreamObserver<GetExternalVehiclesResponse> responseObserver) {
+
+        try {
+            GetExternalVehiclesResponse.Builder response = GetExternalVehiclesResponse.newBuilder();
+            for (VehiculoExterno solicitud : vehicleService.getExternosDeCliente(request.getClienteId())) {
+                response.addExternalVehicles(toExternalVehicleData(solicitud));
+            }
+            responseObserver.onNext(response.build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    private ExternalVehicleData toExternalVehicleData(VehiculoExterno solicitud) {
+        ExternalVehicleData.Builder data = ExternalVehicleData.newBuilder()
+                .setId(solicitud.getId())
+                .setClienteId(solicitud.getClienteId())
+                .setPatente(solicitud.getPatente())
+                .setMarca(solicitud.getMarca())
+                .setModelo(solicitud.getModelo())
+                .setAnio(solicitud.getAnio())
+                .setColor(solicitud.getColor() == null ? "" : solicitud.getColor())
+                .setTipo(VehicleType.valueOf(
+                        "VEHICLE_TYPE_" + solicitud.getTipo().name()))
+                .setPrecioDiario(solicitud.getPrecioDiario())
+                .setEstado(ExternalVehicleStatus.valueOf(
+                        "EXTERNAL_VEHICLE_STATUS_" + solicitud.getEstado().name()));
+        // Una validacion que todavia no respondio queda UNSPECIFIED
+        if (solicitud.getResultadoPatente() != null) {
+            data.setResultadoPatente(ExternalValidationResult.valueOf(
+                    "EXTERNAL_VALIDATION_RESULT_" + solicitud.getResultadoPatente().name()));
+        }
+        if (solicitud.getResultadoTitularidad() != null) {
+            data.setResultadoTitularidad(ExternalValidationResult.valueOf(
+                    "EXTERNAL_VALIDATION_RESULT_" + solicitud.getResultadoTitularidad().name()));
+        }
+        if (solicitud.getVehicleId() != null) {
+            data.setVehicleId(solicitud.getVehicleId());
+        }
+        return data.build();
     }
 
     private VehicleData toVehicleData(Vehicle vehicle) {

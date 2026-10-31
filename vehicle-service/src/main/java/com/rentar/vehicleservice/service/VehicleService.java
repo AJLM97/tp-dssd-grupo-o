@@ -1,13 +1,20 @@
 package com.rentar.vehicleservice.service;
 
+import com.rentar.vehicleservice.entity.EstadoSolicitudExterna;
 import com.rentar.vehicleservice.entity.EstadoVehiculo;
+import com.rentar.vehicleservice.entity.ResultadoValidacion;
 import com.rentar.vehicleservice.entity.Vehicle;
+import com.rentar.vehicleservice.entity.VehiculoExterno;
 import com.rentar.vehicleservice.entity.VerificacionVehiculo;
+import com.rentar.vehicleservice.kafka.ValidacionCompletada;
+import com.rentar.vehicleservice.kafka.VehiculoExternoRegistrado;
 import com.rentar.vehicleservice.kafka.VerificacionSolicitada;
 import com.rentar.vehicleservice.repository.VehicleRepository;
+import com.rentar.vehicleservice.repository.VehiculoExternoRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import io.grpc.Status;
 
 import java.util.List;
@@ -18,21 +25,18 @@ import java.util.Optional;
 public class VehicleService {
 
     private final VehicleRepository repository;
+    private final VehiculoExternoRepository externoRepository;
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
-    public VehicleService(VehicleRepository repository, KafkaTemplate<String, Object> kafkaTemplate) {
+    public VehicleService(VehicleRepository repository, VehiculoExternoRepository externoRepository,
+                          KafkaTemplate<String, Object> kafkaTemplate) {
         this.repository = repository;
+        this.externoRepository = externoRepository;
         this.kafkaTemplate = kafkaTemplate;
     }
 
     public Vehicle create(Vehicle vehicle) {
-        if (vehicle.getPatente().isBlank()) {
-            throw Status.INVALID_ARGUMENT.withDescription("La patente es obligatoria!").asRuntimeException();
-        }
-        validar(vehicle);
-        if (repository.existsByPatente(vehicle.getPatente())) {
-            throw Status.ALREADY_EXISTS.withDescription("Ya existe un vehiculo con esa patente!").asRuntimeException();
-        }
+        validarAlta(vehicle);
         Vehicle creado = repository.save(vehicle);
         // La verificacion es asincrona: el alta responde sin esperar el resultado. Si Kafka falla, queda PENDIENTE
         kafkaTemplate.send("vehiculos.verificacion.solicitada", String.valueOf(creado.getId()),
@@ -97,6 +101,119 @@ public class VehicleService {
             vehicle.setActivo(false);
         }
         repository.save(vehicle);
+    }
+
+    // La solicitud queda PENDIENTE y se responde enseguida: las dos validaciones llegan despues por Kafka
+    public VehiculoExterno registrarExterno(long clienteId, Vehicle datos) {
+        validarCliente(clienteId);
+        validarAlta(datos);
+        if (externoRepository.existsByPatenteAndEstado(datos.getPatente(), EstadoSolicitudExterna.PENDIENTE)) {
+            throw Status.ALREADY_EXISTS.withDescription("Ya hay una solicitud pendiente con esa patente!").asRuntimeException();
+        }
+        VehiculoExterno solicitud = new VehiculoExterno();
+        solicitud.setClienteId(clienteId);
+        solicitud.setPatente(datos.getPatente());
+        solicitud.setMarca(datos.getMarca());
+        solicitud.setModelo(datos.getModelo());
+        solicitud.setAnio(datos.getAnio());
+        solicitud.setColor(datos.getColor());
+        solicitud.setTipo(datos.getTipo());
+        solicitud.setPrecioDiario(datos.getPrecioDiario());
+
+        VehiculoExterno registrada = externoRepository.save(solicitud);
+        // Si Kafka falla, la solicitud queda PENDIENTE (mismo limite que el alta de vehiculos)
+        kafkaTemplate.send("vehiculos.externos.registrados", String.valueOf(registrada.getId()),
+                        new VehiculoExternoRegistrado(registrada.getId(), clienteId, registrada.getPatente()))
+                .whenComplete((resultado, error) -> {
+                    if (error != null) {
+                        log.error("No se pudo publicar la solicitud del vehiculo externo {}", registrada.getId(), error);
+                    }
+                });
+        return registrada;
+    }
+
+    public List<VehiculoExterno> getExternosDeCliente(long clienteId) {
+        validarCliente(clienteId);
+        return externoRepository.findByClienteId(clienteId);
+    }
+
+    // Lo usa el consumidor de las dos validaciones. Cada resultado se guarda una sola vez: una respuesta repetida no pisa la primera
+    public void registrarValidacionExterna(Long id, boolean esPatente, ResultadoValidacion resultado) {
+        if (id == null || resultado == null) {
+            throw Status.INVALID_ARGUMENT.withDescription("El resultado de la validacion no es valido!").asRuntimeException();
+        }
+        VehiculoExterno solicitud = getExterno(id);
+        boolean esNuevo = esPatente ? solicitud.getResultadoPatente() == null : solicitud.getResultadoTitularidad() == null;
+        if (esNuevo) {
+            if (esPatente) {
+                solicitud.setResultadoPatente(resultado);
+            } else {
+                solicitud.setResultadoTitularidad(resultado);
+            }
+            // Alcanza con un RECHAZADO para rechazar la solicitud
+            if (resultado == ResultadoValidacion.RECHAZADO) {
+                solicitud.setEstado(EstadoSolicitudExterna.RECHAZADO);
+            }
+            externoRepository.save(solicitud);
+        }
+        // Se publica despues de guardar. Si Kafka falla, el reintento del mismo evento llega aca y la vuelve a publicar
+        if (solicitud.getEstado() == EstadoSolicitudExterna.PENDIENTE
+                && solicitud.getResultadoPatente() == ResultadoValidacion.VALIDADO
+                && solicitud.getResultadoTitularidad() == ResultadoValidacion.VALIDADO) {
+            kafkaTemplate.send("vehiculos.externos.validacion.completada", String.valueOf(id), new ValidacionCompletada(id)).join();
+        }
+    }
+
+    // Lo usa el consumidor de completada. Crear el vehiculo y marcar la solicitud van juntos: o se hacen los dos o ninguno
+    @Transactional
+    public VehiculoExterno incorporarExterno(Long id) {
+        if (id == null) {
+            throw Status.INVALID_ARGUMENT.withDescription("El ID de la solicitud no es valido!").asRuntimeException();
+        }
+        VehiculoExterno solicitud = getExterno(id);
+        // Un completada repetido encuentra la solicitud INCORPORADO y no hace nada
+        if (solicitud.getEstado() != EstadoSolicitudExterna.PENDIENTE
+                || solicitud.getResultadoPatente() != ResultadoValidacion.VALIDADO
+                || solicitud.getResultadoTitularidad() != ResultadoValidacion.VALIDADO) {
+            return solicitud;
+        }
+        Vehicle vehicle = new Vehicle();
+        vehicle.setPatente(solicitud.getPatente());
+        vehicle.setMarca(solicitud.getMarca());
+        vehicle.setModelo(solicitud.getModelo());
+        vehicle.setAnio(solicitud.getAnio());
+        vehicle.setColor(solicitud.getColor());
+        vehicle.setTipo(solicitud.getTipo());
+        vehicle.setPrecioDiario(solicitud.getPrecioDiario());
+        // La patente ya la verifico la policia como parte de la solicitud: no se vuelve a pedir la verificacion
+        vehicle.setVerificacion(VerificacionVehiculo.VALIDADO);
+        Vehicle creado = repository.save(vehicle);
+
+        solicitud.setEstado(EstadoSolicitudExterna.INCORPORADO);
+        solicitud.setVehicleId(creado.getId());
+        return externoRepository.save(solicitud);
+    }
+
+    private VehiculoExterno getExterno(long id) {
+        return externoRepository.findById(id)
+                .orElseThrow(() -> Status.NOT_FOUND.withDescription("Solicitud no encontrada").asRuntimeException());
+    }
+
+    private void validarCliente(long clienteId) {
+        if (clienteId <= 0) {
+            throw Status.INVALID_ARGUMENT.withDescription("El ID del cliente debe ser mayor a cero!").asRuntimeException();
+        }
+    }
+
+    // Lo comparten el alta del admin y la solicitud de un cliente
+    private void validarAlta(Vehicle vehicle) {
+        if (vehicle.getPatente().isBlank()) {
+            throw Status.INVALID_ARGUMENT.withDescription("La patente es obligatoria!").asRuntimeException();
+        }
+        validar(vehicle);
+        if (repository.existsByPatente(vehicle.getPatente())) {
+            throw Status.ALREADY_EXISTS.withDescription("Ya existe un vehiculo con esa patente!").asRuntimeException();
+        }
     }
 
     private void validar(Vehicle vehicle) {

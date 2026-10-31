@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 
@@ -94,6 +95,81 @@ export class VehiculosController {
   })
   crear(@Body() body: Partial<Vehiculo>) {
     return this.vehiculosService.crear(body);
+  }
+
+  @Post('externos')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RolUsuario.CLIENTE)
+  @ApiOperation({
+    summary:
+      'Registrar un vehículo propio para sumarlo a Rentar (queda PENDIENTE hasta que terminan las validaciones)',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        patente: {
+          type: 'string',
+          example: 'DEF456',
+        },
+        marca: {
+          type: 'string',
+          example: 'Peugeot',
+        },
+        modelo: {
+          type: 'string',
+          example: '208',
+        },
+        anio: {
+          type: 'number',
+          example: 2022,
+        },
+        color: {
+          type: 'string',
+          example: 'Rojo',
+        },
+        tipo: {
+          type: 'string',
+          example: 'HATCHBACK',
+        },
+        precioDiario: {
+          type: 'number',
+          example: 40000,
+        },
+      },
+      required: ['patente', 'marca', 'modelo', 'anio', 'tipo', 'precioDiario'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Solicitud registrada en estado PENDIENTE.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo un cliente puede registrar su vehículo.',
+  })
+  registrarExterno(@Req() req: any, @Body() body: any) {
+    // El cliente sale del token, nunca del body
+    return this.vehiculosService.registrarExterno(req.user.clienteId, body);
+  }
+
+  @Get('externos/mios')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(RolUsuario.CLIENTE)
+  @ApiOperation({
+    summary: 'Consultar mis solicitudes de vehículos externos',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Solicitudes del cliente, con el resultado de cada validación.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo un cliente puede consultar sus solicitudes.',
+  })
+  obtenerExternosPropios(@Req() req: any) {
+    return this.vehiculosService.obtenerExternosDeCliente(req.user.clienteId);
   }
 
   @Get()
