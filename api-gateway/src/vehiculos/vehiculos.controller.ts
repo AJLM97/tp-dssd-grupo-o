@@ -89,7 +89,7 @@ export class VehiculosController {
     type: Vehiculo,
   })
   @ApiResponse({
-    status: 400,
+    status: 409,
     description: 'La patente ya se encuentra registrada.',
   })
   crear(@Body() body: Partial<Vehiculo>) {
