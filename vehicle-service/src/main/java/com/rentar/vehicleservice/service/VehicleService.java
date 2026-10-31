@@ -2,9 +2,11 @@ package com.rentar.vehicleservice.service;
 
 import com.rentar.vehicleservice.entity.EstadoSolicitudExterna;
 import com.rentar.vehicleservice.entity.EstadoVehiculo;
+import com.rentar.vehicleservice.entity.ResultadoValidacion;
 import com.rentar.vehicleservice.entity.Vehicle;
 import com.rentar.vehicleservice.entity.VehiculoExterno;
 import com.rentar.vehicleservice.entity.VerificacionVehiculo;
+import com.rentar.vehicleservice.kafka.ValidacionCompletada;
 import com.rentar.vehicleservice.kafka.VehiculoExternoRegistrado;
 import com.rentar.vehicleservice.kafka.VerificacionSolicitada;
 import com.rentar.vehicleservice.repository.VehicleRepository;
@@ -12,6 +14,7 @@ import com.rentar.vehicleservice.repository.VehiculoExternoRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import io.grpc.Status;
 
 import java.util.List;
@@ -132,6 +135,68 @@ public class VehicleService {
     public List<VehiculoExterno> getExternosDeCliente(long clienteId) {
         validarCliente(clienteId);
         return externoRepository.findByClienteId(clienteId);
+    }
+
+    // Lo usa el consumidor de las dos validaciones. Cada resultado se guarda una sola vez: una respuesta repetida no pisa la primera
+    public void registrarValidacionExterna(Long id, boolean esPatente, ResultadoValidacion resultado) {
+        if (id == null || resultado == null) {
+            throw Status.INVALID_ARGUMENT.withDescription("El resultado de la validacion no es valido!").asRuntimeException();
+        }
+        VehiculoExterno solicitud = getExterno(id);
+        boolean esNuevo = esPatente ? solicitud.getResultadoPatente() == null : solicitud.getResultadoTitularidad() == null;
+        if (esNuevo) {
+            if (esPatente) {
+                solicitud.setResultadoPatente(resultado);
+            } else {
+                solicitud.setResultadoTitularidad(resultado);
+            }
+            // Alcanza con un RECHAZADO para rechazar la solicitud
+            if (resultado == ResultadoValidacion.RECHAZADO) {
+                solicitud.setEstado(EstadoSolicitudExterna.RECHAZADO);
+            }
+            externoRepository.save(solicitud);
+        }
+        // Se publica despues de guardar. Si Kafka falla, el reintento del mismo evento llega aca y la vuelve a publicar
+        if (solicitud.getEstado() == EstadoSolicitudExterna.PENDIENTE
+                && solicitud.getResultadoPatente() == ResultadoValidacion.VALIDADO
+                && solicitud.getResultadoTitularidad() == ResultadoValidacion.VALIDADO) {
+            kafkaTemplate.send("vehiculos.externos.validacion.completada", String.valueOf(id), new ValidacionCompletada(id)).join();
+        }
+    }
+
+    // Lo usa el consumidor de completada. Crear el vehiculo y marcar la solicitud van juntos: o se hacen los dos o ninguno
+    @Transactional
+    public VehiculoExterno incorporarExterno(Long id) {
+        if (id == null) {
+            throw Status.INVALID_ARGUMENT.withDescription("El ID de la solicitud no es valido!").asRuntimeException();
+        }
+        VehiculoExterno solicitud = getExterno(id);
+        // Un completada repetido encuentra la solicitud INCORPORADO y no hace nada
+        if (solicitud.getEstado() != EstadoSolicitudExterna.PENDIENTE
+                || solicitud.getResultadoPatente() != ResultadoValidacion.VALIDADO
+                || solicitud.getResultadoTitularidad() != ResultadoValidacion.VALIDADO) {
+            return solicitud;
+        }
+        Vehicle vehicle = new Vehicle();
+        vehicle.setPatente(solicitud.getPatente());
+        vehicle.setMarca(solicitud.getMarca());
+        vehicle.setModelo(solicitud.getModelo());
+        vehicle.setAnio(solicitud.getAnio());
+        vehicle.setColor(solicitud.getColor());
+        vehicle.setTipo(solicitud.getTipo());
+        vehicle.setPrecioDiario(solicitud.getPrecioDiario());
+        // La patente ya la verifico la policia como parte de la solicitud: no se vuelve a pedir la verificacion
+        vehicle.setVerificacion(VerificacionVehiculo.VALIDADO);
+        Vehicle creado = repository.save(vehicle);
+
+        solicitud.setEstado(EstadoSolicitudExterna.INCORPORADO);
+        solicitud.setVehicleId(creado.getId());
+        return externoRepository.save(solicitud);
+    }
+
+    private VehiculoExterno getExterno(long id) {
+        return externoRepository.findById(id)
+                .orElseThrow(() -> Status.NOT_FOUND.withDescription("Solicitud no encontrada").asRuntimeException());
     }
 
     private void validarCliente(long clienteId) {
