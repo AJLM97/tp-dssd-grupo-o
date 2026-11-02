@@ -1,17 +1,16 @@
 package com.rentar.vehicleservice.grpc;
 
 import com.rentar.vehicleservice.entity.EstadoVehiculo;
+import com.rentar.vehicleservice.entity.TipoVehiculo;
 import com.rentar.vehicleservice.entity.Vehicle;
+import com.rentar.vehicleservice.entity.VehiculoExterno;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import com.rentar.vehicleservice.service.VehicleService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
-import java.util.function.Supplier;
 
 @GrpcService
 public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBase {
@@ -22,31 +21,73 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         this.vehicleService = vehicleService;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(VehicleGrpcService.class);
-
     @Override
-    public void createVehicle(
-            CreateVehicleRequest request,
-            StreamObserver<VehicleResponse> responseObserver) {
+    public void createVehicle(CreateVehicleRequest request, StreamObserver<CreateVehicleResponse> responseObserver) {
 
-        respond(responseObserver, () -> toResponse(vehicleService.create(request)));
+        try {
+            Vehicle vehicle = new Vehicle();
+            vehicle.setPatente(request.getPatente().trim());
+            vehicle.setMarca(request.getMarca().trim());
+            vehicle.setModelo(request.getModelo().trim());
+            vehicle.setAnio(request.getAnio());
+            vehicle.setColor(request.getColor().isBlank() ? null : request.getColor().trim());
+            vehicle.setTipo(toTipo(request.getTipo()));
+            vehicle.setPrecioDiario(request.getPrecioDiario());
+
+            Vehicle creado = vehicleService.create(vehicle);
+            responseObserver.onNext(CreateVehicleResponse.newBuilder()
+                    .setVehicle(toVehicleData(creado))
+                    .build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override
-    public void updateVehicle(
-            UpdateVehicleRequest request,
-            StreamObserver<VehicleResponse> responseObserver) {
+    public void updateVehicle(UpdateVehicleRequest request, StreamObserver<UpdateVehicleResponse> responseObserver) {
 
-        respond(responseObserver,
-                () -> toResponse(vehicleService.update(request)));
+        try {
+            Vehicle datos = new Vehicle();
+            datos.setMarca(request.getMarca().trim());
+            datos.setModelo(request.getModelo().trim());
+            datos.setAnio(request.getAnio());
+            datos.setColor(request.getColor().isBlank() ? null : request.getColor().trim());
+            datos.setTipo(toTipo(request.getTipo()));
+            datos.setPrecioDiario(request.getPrecioDiario());
+
+            Vehicle actualizado = vehicleService.update(request.getId(), datos);
+            responseObserver.onNext(UpdateVehicleResponse.newBuilder()
+                    .setVehicle(toVehicleData(actualizado))
+                    .build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
     }
 
     @Override
-    public void getVehicleById(GetVehicleByIdRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void deleteVehicle(DeleteVehicleRequest request, StreamObserver<DeleteVehicleResponse> responseObserver) {
+
+        try {
+            Vehicle vehicle = vehicleService.delete(request.getId());
+            responseObserver.onNext(DeleteVehicleResponse.newBuilder()
+                    .setVehicle(toVehicleData(vehicle))
+                    .build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void getVehicleById(GetVehicleByIdRequest request, StreamObserver<GetVehicleByIdResponse> responseObserver) {
 
         try {
             Vehicle vehicle = vehicleService.getById(request.getId());
-            responseObserver.onNext(toResponse(vehicle));
+            responseObserver.onNext(GetVehicleByIdResponse.newBuilder()
+                    .setVehicle(toVehicleData(vehicle))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -58,7 +99,7 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         GetVehiclesResponse.Builder response = GetVehiclesResponse.newBuilder();
 
         for (Vehicle vehicle : vehicleService.getAll(request.getSoloActivos())) {
-            response.addVehicles(toResponse(vehicle));
+            response.addVehicles(toVehicleData(vehicle));
         }
 
         responseObserver.onNext(response.build());
@@ -66,15 +107,18 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
     }
 
     @Override
-    public void updateVehicleStatus(UpdateVehicleStatusRequest request, StreamObserver<VehicleResponse> responseObserver) {
+    public void updateVehicleStatus(UpdateVehicleStatusRequest request, StreamObserver<UpdateVehicleStatusResponse> responseObserver) {
 
         try {
             if (request.getNuevoEstado() == VehicleStatus.VEHICLE_STATUS_UNSPECIFIED || request.getNuevoEstado() == VehicleStatus.UNRECOGNIZED) {
                 throw Status.INVALID_ARGUMENT.withDescription("El nuevo estado no es valido!").asRuntimeException();
             }
-            EstadoVehiculo nuevoEstado = EstadoVehiculo.valueOf(request.getNuevoEstado().name());
+            EstadoVehiculo nuevoEstado = EstadoVehiculo.valueOf(
+                    request.getNuevoEstado().name().substring("VEHICLE_STATUS_".length()));
             Vehicle vehicle = vehicleService.updateStatus(request.getId(), nuevoEstado);
-            responseObserver.onNext(toResponse(vehicle));
+            responseObserver.onNext(UpdateVehicleStatusResponse.newBuilder()
+                    .setVehicle(toVehicleData(vehicle))
+                    .build());
             responseObserver.onCompleted();
         } catch (StatusRuntimeException e) {
             responseObserver.onError(e);
@@ -108,8 +152,75 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
         }
     }
 
-    private VehicleResponse toResponse(Vehicle vehicle) {
-        return VehicleResponse.newBuilder()
+    @Override
+    public void registerExternalVehicle(RegisterExternalVehicleRequest request, StreamObserver<RegisterExternalVehicleResponse> responseObserver) {
+
+        try {
+            Vehicle datos = new Vehicle();
+            datos.setPatente(request.getPatente().trim());
+            datos.setMarca(request.getMarca().trim());
+            datos.setModelo(request.getModelo().trim());
+            datos.setAnio(request.getAnio());
+            datos.setColor(request.getColor().isBlank() ? null : request.getColor().trim());
+            datos.setTipo(toTipo(request.getTipo()));
+            datos.setPrecioDiario(request.getPrecioDiario());
+
+            VehiculoExterno solicitud = vehicleService.registrarExterno(request.getClienteId(), datos);
+            responseObserver.onNext(RegisterExternalVehicleResponse.newBuilder()
+                    .setExternalVehicle(toExternalVehicleData(solicitud))
+                    .build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    @Override
+    public void getExternalVehicles(GetExternalVehiclesRequest request, StreamObserver<GetExternalVehiclesResponse> responseObserver) {
+
+        try {
+            GetExternalVehiclesResponse.Builder response = GetExternalVehiclesResponse.newBuilder();
+            for (VehiculoExterno solicitud : vehicleService.getExternosDeCliente(request.getClienteId())) {
+                response.addExternalVehicles(toExternalVehicleData(solicitud));
+            }
+            responseObserver.onNext(response.build());
+            responseObserver.onCompleted();
+        } catch (StatusRuntimeException e) {
+            responseObserver.onError(e);
+        }
+    }
+
+    private ExternalVehicleData toExternalVehicleData(VehiculoExterno solicitud) {
+        ExternalVehicleData.Builder data = ExternalVehicleData.newBuilder()
+                .setId(solicitud.getId())
+                .setClienteId(solicitud.getClienteId())
+                .setPatente(solicitud.getPatente())
+                .setMarca(solicitud.getMarca())
+                .setModelo(solicitud.getModelo())
+                .setAnio(solicitud.getAnio())
+                .setColor(solicitud.getColor() == null ? "" : solicitud.getColor())
+                .setTipo(VehicleType.valueOf(
+                        "VEHICLE_TYPE_" + solicitud.getTipo().name()))
+                .setPrecioDiario(solicitud.getPrecioDiario())
+                .setEstado(ExternalVehicleStatus.valueOf(
+                        "EXTERNAL_VEHICLE_STATUS_" + solicitud.getEstado().name()));
+        // Una validacion que todavia no respondio queda UNSPECIFIED
+        if (solicitud.getResultadoPatente() != null) {
+            data.setResultadoPatente(ExternalValidationResult.valueOf(
+                    "EXTERNAL_VALIDATION_RESULT_" + solicitud.getResultadoPatente().name()));
+        }
+        if (solicitud.getResultadoTitularidad() != null) {
+            data.setResultadoTitularidad(ExternalValidationResult.valueOf(
+                    "EXTERNAL_VALIDATION_RESULT_" + solicitud.getResultadoTitularidad().name()));
+        }
+        if (solicitud.getVehicleId() != null) {
+            data.setVehicleId(solicitud.getVehicleId());
+        }
+        return data.build();
+    }
+
+    private VehicleData toVehicleData(Vehicle vehicle) {
+        VehicleData.Builder data = VehicleData.newBuilder()
                 .setId(vehicle.getId())
                 .setPatente(vehicle.getPatente())
                 .setMarca(vehicle.getMarca())
@@ -118,33 +229,23 @@ public class VehicleGrpcService extends VehicleServiceGrpc.VehicleServiceImplBas
                 .setPrecioDiario(vehicle.getPrecioDiario())
                 .setAnio(vehicle.getAnio())
                 .setColor(vehicle.getColor() == null ? "" : vehicle.getColor())
-                .setEstado(VehicleStatus.valueOf(vehicle.getEstado().name()))
-                .setTipo(VehicleType.valueOf(vehicle.getTipo().name()))
-                .build();
+                .setEstado(VehicleStatus.valueOf(
+                        "VEHICLE_STATUS_" + vehicle.getEstado().name()))
+                .setTipo(VehicleType.valueOf(
+                        "VEHICLE_TYPE_" + vehicle.getTipo().name()));
+        // Los vehiculos anteriores al Hito 3 no tienen verificacion: queda UNSPECIFIED
+        if (vehicle.getVerificacion() != null) {
+            data.setVerificacion(VehicleVerification.valueOf(
+                    "VEHICLE_VERIFICATION_" + vehicle.getVerificacion().name()));
+        }
+        return data.build();
     }
 
-    private <T> void respond(
-            StreamObserver<T> responseObserver,
-            Supplier<T> operation) {
-
-        T response;
-
-        try {
-            response = operation.get();
-        } catch (StatusRuntimeException exception) {
-            responseObserver.onError(exception);
-            return;
-        } catch (Exception exception) {
-            log.error("Error al procesar la solicitud de crear vehiculo", exception);
-
-            responseObserver.onError(
-                    Status.INTERNAL
-                            .withDescription("No se pudo procesar la solicitud de crear vehiculo")
-                            .asRuntimeException());
-            return;
+    private TipoVehiculo toTipo(VehicleType tipo) {
+        if (tipo == VehicleType.VEHICLE_TYPE_UNSPECIFIED || tipo == VehicleType.UNRECOGNIZED) {
+            throw Status.INVALID_ARGUMENT.withDescription("El tipo de vehiculo no es valido!").asRuntimeException();
         }
-
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
+        return TipoVehiculo.valueOf(
+                tipo.name().substring("VEHICLE_TYPE_".length()));
     }
 }

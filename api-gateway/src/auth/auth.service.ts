@@ -23,7 +23,7 @@ interface CustomerServiceGrpc {
   authenticateCustomer(data: {
     email: string;
     password: string;
-  }): Observable<ClienteAutenticado>;
+  }): Observable<{ customer: ClienteAutenticado }>;
 }
 
 @Injectable()
@@ -44,9 +44,10 @@ export class AuthService implements OnModuleInit {
     let cliente: ClienteAutenticado;
 
     try {
-      cliente = await lastValueFrom(
+      const response = await lastValueFrom(
         this.customerGrpcService.authenticateCustomer(credenciales),
       );
+      cliente = response.customer;
     } catch (error) {
       if (
         typeof error === 'object' &&
@@ -87,11 +88,16 @@ export class AuthService implements OnModuleInit {
   }
 
   private convertirRol(rol: number | string): RolUsuario {
-    if (rol === 1 || rol === 'CLIENTE') {
+    if (rol === 1 || rol === 'CLIENTE' || rol === 'ROLE_CLIENTE') {
       return RolUsuario.CLIENTE;
     }
 
-    if (rol === 2 || rol === 'ADMINISTRADOR' || rol === 'ADMIN') {
+    if (
+      rol === 2 ||
+      rol === 'ADMINISTRADOR' ||
+      rol === 'ROLE_ADMINISTRADOR' ||
+      rol === 'ADMIN'
+    ) {
       return RolUsuario.ADMIN;
     }
 

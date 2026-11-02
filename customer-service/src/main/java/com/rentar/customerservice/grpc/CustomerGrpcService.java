@@ -32,29 +32,35 @@ public class CustomerGrpcService
     @Override
     public void createCustomer(
             CreateCustomerRequest request,
-            StreamObserver<CustomerResponse> responseObserver) {
+            StreamObserver<CreateCustomerResponse> responseObserver) {
 
         respond(responseObserver,
-                () -> toResponse(customerService.create(request)));
+                () -> CreateCustomerResponse.newBuilder()
+                        .setCustomer(toCustomerData(customerService.create(request)))
+                        .build());
     }
 
     @Override
     public void updateCustomer(
             UpdateCustomerRequest request,
-            StreamObserver<CustomerResponse> responseObserver) {
+            StreamObserver<UpdateCustomerResponse> responseObserver) {
 
         respond(responseObserver,
-                () -> toResponse(customerService.update(request)));
+                () -> UpdateCustomerResponse.newBuilder()
+                        .setCustomer(toCustomerData(customerService.update(request)))
+                        .build());
     }
 
     @Override
     public void deleteCustomer(
             DeleteCustomerRequest request,
-            StreamObserver<CustomerResponse> responseObserver) {
+            StreamObserver<DeleteCustomerResponse> responseObserver) {
 
         respond(responseObserver,
-                () -> toResponse(
-                        customerService.delete(request.getId())));
+                () -> DeleteCustomerResponse.newBuilder()
+                        .setCustomer(toCustomerData(
+                                customerService.delete(request.getId())))
+                        .build());
     }
 
     @Override
@@ -68,7 +74,7 @@ public class CustomerGrpcService
 
             for (Customer customer :
                     customerService.getAll(request.getSoloActivos())) {
-                response.addCustomers(toResponse(customer));
+                response.addCustomers(toCustomerData(customer));
             }
 
             return response.build();
@@ -78,11 +84,13 @@ public class CustomerGrpcService
     @Override
     public void getCustomerById(
             GetCustomerByIdRequest request,
-            StreamObserver<CustomerResponse> responseObserver) {
+            StreamObserver<GetCustomerByIdResponse> responseObserver) {
 
         respond(responseObserver,
-                () -> toResponse(
-                        customerService.getById(request.getId())));
+                () -> GetCustomerByIdResponse.newBuilder()
+                        .setCustomer(toCustomerData(
+                                customerService.getById(request.getId())))
+                        .build());
     }
 
     @Override
@@ -114,8 +122,8 @@ public class CustomerGrpcService
         });
     }
 
-    private CustomerResponse toResponse(Customer customer) {
-        return CustomerResponse.newBuilder()
+    private CustomerData toCustomerData(Customer customer) {
+        return CustomerData.newBuilder()
                 .setId(customer.getId())
                 .setDocumento(safeString(customer.getDocumento()))
                 .setNombre(safeString(customer.getNombre()))
@@ -133,12 +141,12 @@ public class CustomerGrpcService
 
     private com.rentar.customerservice.grpc.Role mapRoleToProto(Role role) {
         if (role == null) {
-            return com.rentar.customerservice.grpc.Role.CLIENTE;
+            return com.rentar.customerservice.grpc.Role.ROLE_CLIENTE;
         }
 
         return switch (role) {
-            case ADMINISTRADOR -> com.rentar.customerservice.grpc.Role.ADMINISTRADOR;
-            case CLIENTE -> com.rentar.customerservice.grpc.Role.CLIENTE;
+            case ADMINISTRADOR -> com.rentar.customerservice.grpc.Role.ROLE_ADMINISTRADOR;
+            case CLIENTE -> com.rentar.customerservice.grpc.Role.ROLE_CLIENTE;
         };
     }
 
@@ -176,10 +184,15 @@ public class CustomerGrpcService
     @Override
     public void authenticateCustomer(
             AuthenticateCustomerRequest request,
-            StreamObserver<CustomerResponse> responseObserver) {
+            StreamObserver<AuthenticateCustomerResponse> responseObserver) {
 
         respond(responseObserver, () ->
-                toResponse(customerService.authenticate(request.getEmail(), request.getPassword()))
+                AuthenticateCustomerResponse.newBuilder()
+                        .setCustomer(toCustomerData(
+                                customerService.authenticate(
+                                        request.getEmail(),
+                                        request.getPassword())))
+                        .build()
         );
     }
 }

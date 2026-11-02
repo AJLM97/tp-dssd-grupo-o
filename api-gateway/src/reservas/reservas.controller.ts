@@ -72,6 +72,10 @@ export class ReservasController {
       'Validación de cliente/auto inactivo, fechas pasadas o solapamiento fallida.',
   })
   @ApiResponse({
+    status: 409,
+    description: 'El vehículo ya tiene una reserva confirmada en ese período.',
+  })
+  @ApiResponse({
     status: 404,
     description: 'Cliente o vehículo no encontrado.',
   })
@@ -97,7 +101,7 @@ export class ReservasController {
     type: Reserva,
   })
   @ApiResponse({
-    status: 400,
+    status: 409,
     description: 'El período de alquiler ya ha comenzado.',
   })
   @ApiResponse({

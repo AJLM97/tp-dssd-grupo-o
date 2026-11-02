@@ -24,6 +24,7 @@ export const QUERY_RESERVAS = gql`
       precioDiario
       importeTotal
       estado
+      mantenimientoEstado
       cliente {
         id
         nombre
@@ -49,6 +50,7 @@ export const QUERY_HISTORIAL_CLIENTE = gql`
       cantidadDias
       importeTotal
       estado
+      mantenimientoEstado
       vehiculo {
         id
         patente

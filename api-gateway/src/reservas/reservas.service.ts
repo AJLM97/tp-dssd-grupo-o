@@ -1,20 +1,28 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, OnModuleInit, BadRequestException } from '@nestjs/common';
 import { type ClientGrpc } from '@nestjs/microservices';
 import { Observable, lastValueFrom } from 'rxjs';
+import { ClientesService } from '../clientes/clientes.service';
+import { EstadoMantenimiento } from '../enums/estado-mantenimiento.enum';
 
 interface RentalServiceGrpc {
-  createRental(data: any): Observable<any>;
+  createRental(data: any): Observable<{ rental: any }>;
   getRentals(data: any): Observable<any>;
-  cancelRental(data: any): Observable<any>;
+  cancelRental(data: any): Observable<{ rental: any }>;
   getRentalHistory(data: any): Observable<any>;
 }
 
 interface VehicleServiceGrpc {
-  getVehicles(data: { solo_activos: boolean }): Observable<{
+  getVehicles(data: { soloActivos: boolean }): Observable<{
     vehicles: Array<{
       id: number | string;
       tipo: number | string;
     }>;
+  }>;
+  getVehicleById(data: { id: number }): Observable<{ vehicle: { precioDiario: number } }>;
+  // proto3 no envía los false: si el vehículo no está disponible, "disponible" llega vacío
+  checkAvailability(data: { vehicleId: number; fechaInicio: string; fechaFin: string }): Observable<{
+    disponible?: boolean;
+    mensaje: string;
   }>;
 }
 
@@ -23,28 +31,49 @@ export class ReservasService implements OnModuleInit {
   private rentalGrpcService: RentalServiceGrpc;
   private vehicleGrpcService: VehicleServiceGrpc;
 
-  constructor(@Inject('RENTAL_SERVICE') private readonly client: ClientGrpc, @Inject('VEHICLE_SERVICE') private readonly vehicleClient: ClientGrpc) { }
+  constructor(@Inject('RENTAL_SERVICE') private readonly client: ClientGrpc, @Inject('VEHICLE_SERVICE') private readonly vehicleClient: ClientGrpc, private readonly clientesService: ClientesService) { }
 
   onModuleInit() {
     this.rentalGrpcService = this.client.getService<RentalServiceGrpc>('RentalService');
     this.vehicleGrpcService = this.vehicleClient.getService<VehicleServiceGrpc>('VehicleService');
   }
 
+  // Coordina el alta como pide el enunciado: cliente activo, vehículo activo y precio del vehículo antes de reservar
   async crearReserva(data: any) {
-    return await lastValueFrom(this.rentalGrpcService.createRental({
+    const cliente = await this.clientesService.validar(data.clienteId);
+    if (!cliente.valido) {
+      throw new BadRequestException(cliente.mensaje);
+    }
+
+    const disponibilidad = await lastValueFrom(this.vehicleGrpcService.checkAvailability({
+      vehicleId: data.vehiculoId,
+      fechaInicio: data.fechaInicio,
+      fechaFin: data.fechaFin,
+    }));
+    if (!disponibilidad.disponible) {
+      throw new BadRequestException(disponibilidad.mensaje);
+    }
+
+    const responseVehiculo = await lastValueFrom(
+      this.vehicleGrpcService.getVehicleById({ id: data.vehiculoId }),
+    );
+
+    const response = await lastValueFrom(this.rentalGrpcService.createRental({
       customerId: data.clienteId,
       vehicleId: data.vehiculoId,
       fechaInicio: data.fechaInicio,
       fechaFin: data.fechaFin,
-      precioDiario: data.precioDiario || 0,
+      precioDiario: responseVehiculo.vehicle.precioDiario,
     }));
+    return this.normalizarReserva(response.rental);
   }
 
   async cancelarReserva(id: number) {
-    return await lastValueFrom(this.rentalGrpcService.cancelRental({
+    const response = await lastValueFrom(this.rentalGrpcService.cancelRental({
       rentalId: id,
       customerId: 0,
     }));
+    return this.normalizarReserva(response.rental);
   }
 
   async buscar(filtros: any) {
@@ -56,11 +85,13 @@ export class ReservasService implements OnModuleInit {
         }),
       ),
       lastValueFrom(
-        this.vehicleGrpcService.getVehicles({ solo_activos: false }),
+        this.vehicleGrpcService.getVehicles({ soloActivos: false }),
       ),
     ]);
 
-    const reservas = respuestaReservas.rentals || [];
+    const reservas = (respuestaReservas.rentals || []).map((reserva: any) =>
+      this.normalizarReserva(reserva),
+    );
     const tiposPorNumero: Record<number, string> = {
       1: 'SEDAN',
       2: 'SUV',
@@ -80,7 +111,7 @@ export class ReservasService implements OnModuleInit {
         return tipo;
       }
 
-      return texto;
+      return texto.replace(/^VEHICLE_TYPE_/, '');
     };
 
     const vehiculosPorId = new Map(
@@ -127,6 +158,49 @@ export class ReservasService implements OnModuleInit {
       }),
     );
 
-    return res.rentals || [];
+    return (res.rentals || []).map((rental: any) =>
+      this.normalizarReserva(rental),
+    );
+  }
+
+  private normalizarReserva(reserva: any) {
+    return {
+      ...reserva,
+      estado:
+        typeof reserva.estado === 'string'
+          ? reserva.estado.replace(/^RENTAL_STATUS_/, '')
+          : reserva.estado,
+      mantenimientoEstado: this.normalizarEstadoMantenimiento(
+        reserva.mantenimientoEstado ?? reserva.mantenimiento_estado,
+      ),
+    };
+  }
+
+  private normalizarEstadoMantenimiento(estado: unknown): EstadoMantenimiento {
+    if (
+      estado === undefined ||
+      estado === null ||
+      estado === '' ||
+      estado === 0 ||
+      estado === '0' ||
+      estado === 'MAINTENANCE_STATUS_UNSPECIFIED'
+    ) {
+      return EstadoMantenimiento.PENDIENTE;
+    }
+
+    const normalizado =
+      typeof estado === 'string'
+        ? estado.replace(/^MAINTENANCE_STATUS_/, '')
+        : String(estado);
+
+    if (
+      Object.values(EstadoMantenimiento).includes(
+        normalizado as EstadoMantenimiento,
+      )
+    ) {
+      return normalizado as EstadoMantenimiento;
+    }
+
+    throw new Error(`Estado de mantenimiento gRPC desconocido: ${String(estado)}`);
   }
 }

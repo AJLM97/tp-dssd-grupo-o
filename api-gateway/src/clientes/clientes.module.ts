@@ -3,6 +3,7 @@ import { ClientesController } from './clientes.controller';
 import { ClientesService } from './clientes.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { GRPC_LOADER } from '../proto/grpc-loader';
 
 @Module({
   imports: [
@@ -12,8 +13,9 @@ import { join } from 'path';
         transport: Transport.GRPC,
         options: {
           package: 'customer',
-          protoPath: join(process.cwd(), 'src/proto/customer.proto'),
+          protoPath: join(process.cwd(), 'src/proto/customer/customer.proto'),
           url: process.env.CUSTOMER_SERVICE_URL || 'localhost:9092',
+          loader: GRPC_LOADER,
         },
       },
     ]),

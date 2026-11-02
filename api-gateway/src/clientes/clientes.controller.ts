@@ -72,7 +72,7 @@ export class ClientesController {
     type: Cliente,
   })
   @ApiResponse({
-    status: 400,
+    status: 409,
     description: 'Documento o email ya registrado.',
   })
   crear(@Body() body: Partial<Cliente>) {
@@ -146,7 +146,7 @@ export class ClientesController {
     type: Cliente,
   })
   @ApiResponse({
-    status: 400,
+    status: 409,
     description: 'Documento o email en conflicto.',
   })
   @ApiResponse({

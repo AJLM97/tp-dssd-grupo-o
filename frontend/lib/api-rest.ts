@@ -59,8 +59,65 @@ export async function crearVehiculo(
   return resultado;
 }
 
-export async function deleteVehiculoApi(id: number) {
-  const res = await fetch(`${API_URL}/vehiculos/${id}`, { method: "DELETE" });
+// Solicitud de un cliente para sumar su vehículo. Los resultados faltan mientras la validación no respondió
+export type VehiculoExterno = {
+  id: number;
+  patente: string;
+  marca: string;
+  modelo: string;
+  anio: number;
+  color?: string;
+  tipo: string;
+  precioDiario: number;
+  estado: 'PENDIENTE' | 'INCORPORADO' | 'RECHAZADO';
+  resultadoPatente?: 'VALIDADO' | 'RECHAZADO';
+  resultadoTitularidad?: 'VALIDADO' | 'RECHAZADO';
+};
+
+// El cliente no viaja en el body: el gateway lo toma del token
+export async function registrarVehiculoExterno(
+  datos: Parameters<typeof crearVehiculo>[0],
+  token: string,
+): Promise<VehiculoExterno> {
+  const respuesta = await fetch(`${API_URL}/vehiculos/externos`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      ...datos,
+      anio: Number(datos.anio),
+      precioDiario: Number(datos.precioDiario),
+    }),
+  });
+
+  const resultado = await respuesta.json();
+
+  if (!respuesta.ok) {
+    throw new Error(
+      Array.isArray(resultado.message)
+        ? resultado.message.join(', ')
+        : resultado.message || 'No se pudo registrar el vehículo',
+    );
+  }
+
+  return resultado;
+}
+
+export async function fetchMisVehiculosExternos(token: string): Promise<VehiculoExterno[]> {
+  const res = await fetch(`${API_URL}/vehiculos/externos/mios`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Error al obtener tus vehículos');
+  return res.json();
+}
+
+export async function deleteVehiculoApi(id: number, accessToken: string) {
+  const res = await fetch(`${API_URL}/vehiculos/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error("Error al dar de baja el vehículo");
   return res.json();
 }
@@ -154,8 +211,11 @@ export async function iniciarSesion(email: string, password: string) {
   } as RespuestaLogin;
 }
 
-export async function deleteClienteApi(id: number) {
-  const res = await fetch(`${API_URL}/clientes/${id}`, { method: "DELETE" });
+export async function deleteClienteApi(id: number, accessToken: string) {
+  const res = await fetch(`${API_URL}/clientes/${id}`, {
+    method: "DELETE",
+    headers: { "Authorization": `Bearer ${accessToken}` },
+  });
   if (!res.ok) throw new Error("Error al dar de baja el cliente");
   return res.json();
 }
@@ -163,7 +223,6 @@ export async function deleteClienteApi(id: number) {
 type DatosReserva = {
   clienteId: number | string;
   vehiculoId: number | string;
-  precioDiario: number | string;
   fechaInicio: string;
   fechaFin: string;
 };
@@ -173,7 +232,6 @@ export async function postReserva({
   vehiculoId,
   fechaInicio,
   fechaFin,
-  precioDiario,
 }: DatosReserva) {
   const respuesta = await fetch(`${API_URL}/reservas`, {
     method: "POST",
@@ -181,7 +239,6 @@ export async function postReserva({
     body: JSON.stringify({
       clienteId: Number(clienteId),
       vehiculoId: Number(vehiculoId),
-      precioDiario: Number(precioDiario),
       fechaInicio: new Date(fechaInicio).toISOString().slice(0, 19),
       fechaFin: new Date(fechaFin).toISOString().slice(0, 19),
     }),

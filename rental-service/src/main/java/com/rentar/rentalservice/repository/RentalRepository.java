@@ -24,6 +24,8 @@ public interface RentalRepository extends JpaRepository<Rental, Long> {
                                         @Param("fechaFin") LocalDateTime fechaFin);
 
     @Query("SELECT r FROM Rental r WHERE r.customerId = :customerId " +
-            "AND r.estado IN ('FINALIZADA', 'CANCELADA')")
-    List<Rental> findHistoryByCustomerId(@Param("customerId") Long customerId);
+            "AND (r.estado IN ('FINALIZADA', 'CANCELADA') " +
+            "OR (r.estado IN ('CONFIRMADA', 'EN_CURSO') AND r.fechaFin < :ahora))")
+    List<Rental> findHistoryByCustomerId(@Param("customerId") Long customerId,
+                                         @Param("ahora") LocalDateTime ahora);
 }

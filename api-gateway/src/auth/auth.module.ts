@@ -6,6 +6,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { join } from 'node:path';
+import { GRPC_LOADER } from '../proto/grpc-loader';
 
 @Module({
   imports: [
@@ -20,8 +21,9 @@ import { join } from 'node:path';
         transport: Transport.GRPC,
         options: {
           package: 'customer',
-          protoPath: join(process.cwd(), 'src/proto/customer.proto'),
+          protoPath: join(process.cwd(), 'src/proto/customer/customer.proto'),
           url: process.env.CUSTOMER_SERVICE_URL || 'localhost:9092',
+          loader: GRPC_LOADER,
         },
       },
     ]),

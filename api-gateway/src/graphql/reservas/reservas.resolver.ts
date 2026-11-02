@@ -1,8 +1,10 @@
-import { UseGuards } from '@nestjs/common';
-import { Args, Query, Resolver } from '@nestjs/graphql';
+import { BadRequestException, ForbiddenException, UseGuards } from '@nestjs/common';
+import { Args, Mutation, Query, Resolver } from '@nestjs/graphql';
 import { ReservasService } from '../../reservas/reservas.service';
 import {
+  CrearReservaInput,
   HistorialClienteResultado,
+  ReservaCreadaResultado,
   ReservaResultado,
   ReservasInput,
 } from './reservas.types';
@@ -10,6 +12,7 @@ import { GqlAuthGuard } from '../../auth/gql-auth.guard';
 import { UsuarioActualGql } from '../../auth/usuario-actual-gql.decorator';
 import { ClientesService } from '../../clientes/clientes.service';
 import { EstadoReserva } from '../../enums/estado-reserva.enum';
+import { EstadoMantenimiento } from '../../enums/estado-mantenimiento.enum';
 
 function convertirEstadoReserva(estado: number | string): EstadoReserva {
   if (
@@ -35,9 +38,77 @@ function convertirEstadoReserva(estado: number | string): EstadoReserva {
   return convertido;
 }
 
+function convertirEstadoMantenimiento(
+  estado: EstadoMantenimiento | number | string,
+): EstadoMantenimiento {
+  if (
+    typeof estado === 'string' &&
+    Object.values(EstadoMantenimiento).includes(estado as EstadoMantenimiento)
+  ) {
+    return estado as EstadoMantenimiento;
+  }
+
+  const estados: Record<number, EstadoMantenimiento> = {
+    1: EstadoMantenimiento.PENDIENTE,
+    2: EstadoMantenimiento.REALIZADO,
+    3: EstadoMantenimiento.NO_REALIZADO,
+  };
+
+  const convertido = estados[Number(estado)];
+  if (!convertido) {
+    throw new Error(`Estado de mantenimiento gRPC desconocido: ${estado}`);
+  }
+  return convertido;
+}
+
 @Resolver(() => ReservaResultado)
 export class ReservasResolver {
   constructor(private readonly reservasService: ReservasService, private readonly clientesService: ClientesService) { }
+
+  @Mutation(() => ReservaCreadaResultado, {
+    name: 'crearReserva',
+    description:
+      'Crea una reserva y devuelve su confirmación sin esperar el mantenimiento preventivo.',
+  })
+  @UseGuards(GqlAuthGuard)
+  async crearReserva(
+    @Args('input') input: CrearReservaInput,
+    @UsuarioActualGql() usuarioActual: any,
+  ): Promise<ReservaCreadaResultado> {
+    let clienteId: number;
+
+    if (usuarioActual.rol === 'CLIENTE') {
+      clienteId = Number(usuarioActual.clienteId || usuarioActual.userId);
+      if (input.clienteId && Number(input.clienteId) !== clienteId) {
+        throw new ForbiddenException('No podés crear una reserva para otro cliente.');
+      }
+    } else if (usuarioActual.rol === 'ADMIN') {
+      if (!input.clienteId || input.clienteId <= 0) {
+        throw new BadRequestException('El cliente es obligatorio para crear una reserva como administrador.');
+      }
+      clienteId = input.clienteId;
+    } else {
+      throw new ForbiddenException('El usuario no tiene permisos para crear reservas.');
+    }
+
+    const rental = await this.reservasService.crearReserva({
+      clienteId,
+      vehiculoId: input.vehiculoId,
+      fechaInicio: input.fechaInicio,
+      fechaFin: input.fechaFin,
+    });
+
+    return {
+      id: Number(rental.id),
+      clienteId: Number(rental.customerId ?? rental.customer_id),
+      vehiculoId: Number(rental.vehicleId ?? rental.vehicle_id),
+      fechaInicio: new Date(rental.fechaInicio ?? rental.fecha_inicio),
+      fechaFin: new Date(rental.fechaFin ?? rental.fecha_fin),
+      importeTotal: Number(rental.importeTotal ?? rental.importe_total),
+      estado: convertirEstadoReserva(rental.estado),
+      mantenimientoEstado: convertirEstadoMantenimiento(rental.mantenimientoEstado),
+    };
+  }
 
   @Query(() => [ReservaResultado], {
     name: 'reservas',
@@ -86,6 +157,7 @@ export class ReservasResolver {
       cantidadDias: Number(r.cantidadDias || 1),
       importeTotal: Number(r.importeTotal || r.importe_total || 0),
       estado: convertirEstadoReserva(r.estado),
+      mantenimientoEstado: convertirEstadoMantenimiento(r.mantenimientoEstado),
     }));
   }
 
@@ -109,6 +181,7 @@ export class ReservasResolver {
       precioDiario: Number(r.precioDiario || r.precio_diario || 0),
       importeTotal: Number(r.importeTotal || r.importe_total || 0),
       estado: convertirEstadoReserva(r.estado),
+      mantenimientoEstado: convertirEstadoMantenimiento(r.mantenimientoEstado),
     };
   }
 }

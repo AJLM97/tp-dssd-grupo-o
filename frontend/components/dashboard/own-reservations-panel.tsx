@@ -5,6 +5,7 @@ import {
     formatCurrency,
     formatDateTime,
     hasRentalStarted,
+    maintenanceStatusLabel,
     reservationStatusLabel,
 } from "@/lib/rentar-mocks";
 import type { Reservation, Vehicle } from "@/lib/rentar-types";
@@ -45,6 +46,7 @@ export function OwnReservationsPanel({
                                 <th>Precio diario</th>
                                 <th>Importe total</th>
                                 <th>Estado</th>
+                                <th>Mantenimiento</th>
                                 <th />
                             </tr>
                         </thead>
@@ -74,6 +76,7 @@ export function OwnReservationsPanel({
                                         <td>{formatCurrency(reservation.dailyPrice)}</td>
                                         <td>{formatCurrency(reservation.totalAmount)}</td>
                                         <td>{reservationStatusLabel(status)}</td>
+                                        <td>{maintenanceStatusLabel(reservation.maintenanceStatus)}</td>
                                         <td>
                                             {canCancel ? (
                                                 <button

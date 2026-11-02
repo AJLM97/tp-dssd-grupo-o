@@ -2,15 +2,20 @@ import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { type ClientGrpc } from '@nestjs/microservices';
 import { Observable, lastValueFrom } from 'rxjs';
 import { ReservasService } from '../reservas/reservas.service';
+import { TipoVehiculo } from '../enums/tipo-vehiculo.enum';
 
 interface VehicleServiceGrpc {
-  createVehicle(data: any): Observable<any>;
-  updateVehicle(data: any): Observable<any>;
-  deleteVehicle(data: { id: number }): Observable<any>;
-  getVehicles(data: { solo_activos: boolean }): Observable<any>;
-  getVehicleById(data: { id: number }): Observable<any>;
+  createVehicle(data: any): Observable<{ vehicle: any }>;
+  updateVehicle(data: any): Observable<{ vehicle: any }>;
+  deleteVehicle(data: { id: number }): Observable<{ vehicle: any }>;
+  getVehicles(data: { soloActivos: boolean }): Observable<{ vehicles: any[] }>;
+  getVehicleById(data: { id: number }): Observable<{ vehicle: any }>;
   checkAvailability(data: any): Observable<any>;
-  updateVehicleStatus(data: any): Observable<any>;
+  updateVehicleStatus(data: any): Observable<{ vehicle: any }>;
+  registerExternalVehicle(data: any): Observable<{ externalVehicle: any }>;
+  getExternalVehicles(data: {
+    clienteId: number;
+  }): Observable<{ externalVehicles: any[] }>;
   checkAvailability(data: {
     vehicleId: number;
     fechaInicio: string;
@@ -29,24 +34,55 @@ export class VehiculosService implements OnModuleInit {
   }
 
   async crear(data: any) {
-    return await lastValueFrom(this.vehicleGrpcService.createVehicle(data));
+    const response = await lastValueFrom(
+      this.vehicleGrpcService.createVehicle(this.prepararVehiculo(data)),
+    );
+    return this.normalizarVehiculo(response.vehicle);
   }
 
   async obtenerTodos() {
-    const res = await lastValueFrom(this.vehicleGrpcService.getVehicles({ solo_activos: false }));
-    return res.vehicles || [];
+    const res = await lastValueFrom(this.vehicleGrpcService.getVehicles({ soloActivos: false }));
+    return (res.vehicles || []).map((vehicle) => this.normalizarVehiculo(vehicle));
   }
 
   async obtenerPorId(id: number) {
-    return await lastValueFrom(this.vehicleGrpcService.getVehicleById({ id }));
+    const response = await lastValueFrom(this.vehicleGrpcService.getVehicleById({ id }));
+    return this.normalizarVehiculo(response.vehicle);
   }
 
   async actualizar(id: number, data: any) {
-    return await lastValueFrom(this.vehicleGrpcService.updateVehicle({ id, ...data }));
+    const response = await lastValueFrom(
+      this.vehicleGrpcService.updateVehicle({
+        id,
+        ...this.prepararVehiculo(data),
+      }),
+    );
+    return this.normalizarVehiculo(response.vehicle);
   }
 
   async bajaLogica(id: number) {
-    return await lastValueFrom(this.vehicleGrpcService.deleteVehicle({ id }));
+    const response = await lastValueFrom(this.vehicleGrpcService.deleteVehicle({ id }));
+    return this.normalizarVehiculo(response.vehicle);
+  }
+
+  async registrarExterno(clienteId: number, data: any) {
+    // clienteId va al final para que un valor del body no lo pise
+    const response = await lastValueFrom(
+      this.vehicleGrpcService.registerExternalVehicle({
+        ...this.prepararVehiculo(data),
+        clienteId,
+      }),
+    );
+    return this.normalizarExterno(response.externalVehicle);
+  }
+
+  async obtenerExternosDeCliente(clienteId: number) {
+    const res = await lastValueFrom(
+      this.vehicleGrpcService.getExternalVehicles({ clienteId }),
+    );
+    return (res.externalVehicles || []).map((solicitud) =>
+      this.normalizarExterno(solicitud),
+    );
   }
 
   async buscarDisponibles(filtros: any) {
@@ -63,20 +99,12 @@ export class VehiculosService implements OnModuleInit {
 
     const [respuestaVehiculos, reservas] = await Promise.all([
       lastValueFrom(
-        this.vehicleGrpcService.getVehicles({ solo_activos: true }),
+        this.vehicleGrpcService.getVehicles({ soloActivos: true }),
       ),
       this.reservasService.buscar({}),
     ]);
 
     const vehiculos = respuestaVehiculos.vehicles || [];
-
-    const tiposVehiculo: Record<number, string> = {
-      1: 'SEDAN',
-      2: 'SUV',
-      3: 'PICKUP',
-      4: 'COUPE',
-      5: 'HATCHBACK',
-    };
 
     return vehiculos.flatMap((vehiculo: any) => {
       const vehiculoId = Number(vehiculo.id);
@@ -84,7 +112,7 @@ export class VehiculosService implements OnModuleInit {
       const ocupado = reservas.some((reserva: any) => {
         const estado =
           typeof reserva.estado === 'string'
-            ? reserva.estado.toUpperCase()
+            ? reserva.estado.toUpperCase().replace(/^RENTAL_STATUS_/, '')
             : ({
               1: 'CONFIRMADA',
               2: 'EN_CURSO',
@@ -118,14 +146,7 @@ export class VehiculosService implements OnModuleInit {
       }
 
       const precioDiario = Number(vehiculo.precioDiario);
-      const tipo =
-        typeof vehiculo.tipo === 'number'
-          ? tiposVehiculo[vehiculo.tipo]
-          : vehiculo.tipo;
-
-      if (!tipo) {
-        throw new Error(`Tipo de vehículo gRPC desconocido: ${vehiculo.tipo}`);
-      }
+      const tipo = this.normalizarTipo(vehiculo.tipo);
 
       if (filtros.tipo && tipo !== filtros.tipo) return [];
       if (
@@ -170,5 +191,79 @@ export class VehiculosService implements OnModuleInit {
         },
       ];
     });
+  }
+
+  private prepararVehiculo(data: any) {
+    if (typeof data.tipo !== 'string' || data.tipo.startsWith('VEHICLE_TYPE_')) {
+      return data;
+    }
+
+    return { ...data, tipo: `VEHICLE_TYPE_${data.tipo}` };
+  }
+
+  private normalizarVehiculo(vehicle: any) {
+    return {
+      ...vehicle,
+      tipo: this.normalizarTipo(vehicle.tipo),
+      estado:
+        typeof vehicle.estado === 'string'
+          ? vehicle.estado.replace(/^VEHICLE_STATUS_/, '')
+          : vehicle.estado,
+      verificacion:
+        typeof vehicle.verificacion === 'string'
+          ? vehicle.verificacion.replace(/^VEHICLE_VERIFICATION_/, '')
+          : vehicle.verificacion,
+    };
+  }
+
+  // Las validaciones que todavía no respondieron no vienen en la respuesta (quedan undefined)
+  private normalizarExterno(solicitud: any) {
+    return {
+      ...solicitud,
+      tipo: this.normalizarTipo(solicitud.tipo),
+      estado: this.quitarPrefijo(solicitud.estado, 'EXTERNAL_VEHICLE_STATUS_'),
+      resultadoPatente: this.quitarPrefijo(
+        solicitud.resultadoPatente,
+        'EXTERNAL_VALIDATION_RESULT_',
+      ),
+      resultadoTitularidad: this.quitarPrefijo(
+        solicitud.resultadoTitularidad,
+        'EXTERNAL_VALIDATION_RESULT_',
+      ),
+    };
+  }
+
+  private quitarPrefijo(valor: unknown, prefijo: string) {
+    return typeof valor === 'string' ? valor.replace(prefijo, '') : valor;
+  }
+
+  private normalizarTipo(tipo: number | string): TipoVehiculo {
+    const tiposVehiculo: Record<number, string> = {
+      1: 'SEDAN',
+      2: 'SUV',
+      3: 'PICKUP',
+      4: 'COUPE',
+      5: 'HATCHBACK',
+    };
+
+    const normalizado =
+      typeof tipo === 'number'
+        ? tiposVehiculo[tipo]
+        : String(tipo).replace(/^VEHICLE_TYPE_/, '').toUpperCase();
+
+    switch (normalizado) {
+      case 'SEDAN':
+        return TipoVehiculo.SEDAN;
+      case 'SUV':
+        return TipoVehiculo.SUV;
+      case 'PICKUP':
+        return TipoVehiculo.PICKUP;
+      case 'COUPE':
+        return TipoVehiculo.COUPE;
+      case 'HATCHBACK':
+        return TipoVehiculo.HATCHBACK;
+      default:
+        throw new Error(`Tipo de vehículo gRPC desconocido: ${tipo}`);
+    }
   }
 }

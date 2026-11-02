@@ -6,6 +6,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AuthModule } from '../auth/auth.module';
 import { ClientesModule } from '../clientes/clientes.module';
 import { join } from 'path';
+import { GRPC_LOADER } from '../proto/grpc-loader';
 
 @Module({
   imports: [
@@ -17,8 +18,9 @@ import { join } from 'path';
         transport: Transport.GRPC,
         options: {
           package: 'rental',
-          protoPath: join(process.cwd(), 'src/proto/rental.proto'),
+          protoPath: join(process.cwd(), 'src/proto/rental/rental.proto'),
           url: process.env.RENTAL_SERVICE_URL || 'localhost:9093',
+          loader: GRPC_LOADER,
         },
       },
       {
@@ -26,8 +28,9 @@ import { join } from 'path';
         transport: Transport.GRPC,
         options: {
           package: 'vehicle',
-          protoPath: join(process.cwd(), 'src/proto/vehicle.proto'),
+          protoPath: join(process.cwd(), 'src/proto/vehicle/vehicle.proto'),
           url: process.env.VEHICLE_SERVICE_URL || 'localhost:9091',
+          loader: GRPC_LOADER,
         },
       },
     ]),

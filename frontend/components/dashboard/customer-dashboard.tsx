@@ -7,9 +7,11 @@ import {
   calculateDays,
   formatCurrency,
   formatDateTime,
+  maintenanceStatusLabel,
   normalizeDate,
   reservationStatusLabel,
   VEHICLE_TYPE_OPTIONS,
+  isVehicleStolen,
 } from "@/lib/rentar-mocks";
 import type { Client, Reservation, UiSection, Vehicle, VehicleType } from "@/lib/rentar-types";
 import { DEFAULT_AVAILABILITY_FILTERS, type AvailabilityFilters } from "./dashboard-types";
@@ -109,14 +111,17 @@ export function CustomerDashboard({
           <div className="grid gap-3 md:grid-cols-2">
             <Select label="Vehiculo *" value={selectedVehicleId ? String(selectedVehicleId) : ""} onChange={(event) => setSelectedVehicleId(event.target.value ? Number(event.target.value) : null)}>
               <option value="">Seleccionar vehiculo</option>
-              {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{`${vehicle.licensePlate} - ${vehicle.brand} ${vehicle.model} (${vehicle.active ? "Activo" : "Inactivo"})`}</option>)}
+              {vehicles.map((vehicle) => {
+                const unavailable = !vehicle.active || isVehicleStolen(vehicle.verification);
+                return <option key={vehicle.id} value={vehicle.id} disabled={unavailable}>{`${vehicle.licensePlate} - ${vehicle.brand} ${vehicle.model} (${unavailable ? "No disponible" : "Activo"})`}</option>;
+              })}
             </Select>
             <Input label="Inicio *" type="datetime-local" value={reservationStartAt} onChange={(event) => setReservationStartAt(event.target.value)} />
             <Input label="Fin *" type="datetime-local" value={reservationEndAt} onChange={(event) => setReservationEndAt(event.target.value)} />
             <div className="rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 md:col-span-2">
               <p>Cliente actual: {currentClient ? `${currentClient.firstName} ${currentClient.lastName}` : "No seleccionado"}</p>
               <p>Estado cliente: {currentClient?.active ? "Activo" : "Inactivo"}</p>
-              {reservationPreview ? <p className="font-semibold text-zinc-900">Vista previa: {reservationPreview.days} dias x {formatCurrency(reservationPreview.dailyPrice)} = {formatCurrency(reservationPreview.total)}</p> : <p>Completa vehiculo + fechas para calcular importe.</p>}
+              {reservationPreview ? <p className="font-semibold text-zinc-900">Vista previa: {reservationPreview.days} dias x {formatCurrency(reservationPreview.dailyPrice)} = {formatCurrency(reservationPreview.total)}</p> : <p>Selecciones un vehículo y las fechas para calcular el importe.</p>}
             </div>
             <div><button type="button" onClick={onCreateReservation} className="rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 cursor-pointer">Confirmar reserva</button></div>
           </div>
@@ -127,7 +132,7 @@ export function CustomerDashboard({
         <SectionCard title="Historial de alquileres" description="Incluye reservas canceladas y alquileres finalizados del cliente actual.">
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Vehiculo</th><th>Patente</th><th>Inicio</th><th>Fin</th><th>Dias</th><th>Importe total</th><th>Estado</th></tr></thead>
+              <thead><tr className="border-b border-zinc-200 text-zinc-600"><th className="py-2">Vehículo</th><th>Patente</th><th>Inicio</th><th>Fin</th><th>Dias</th><th>Importe total</th><th>Estado</th><th>Mantenimiento</th></tr></thead>
               <tbody>
                 {historyRows.map((reservation) => {
                   const vehicle = vehicles.find((item) => item.id === reservation.vehicleId);
@@ -136,7 +141,7 @@ export function CustomerDashboard({
                   const days = start && end ? calculateDays(start, end) : 0;
                   return (
                     <tr key={reservation.id} className="border-b border-zinc-100">
-                      <td className="py-2">{vehicle ? `${vehicle.brand} ${vehicle.model}` : "-"}</td><td>{vehicle?.licensePlate ?? "-"}</td><td>{formatDateTime(reservation.startAt)}</td><td>{formatDateTime(reservation.endAt)}</td><td>{days}</td><td>{formatCurrency(reservation.totalAmount)}</td><td>{reservationStatusLabel(reservation.status)}</td>
+                      <td className="py-2">{vehicle ? `${vehicle.brand} ${vehicle.model}` : "-"}</td><td>{vehicle?.licensePlate ?? "-"}</td><td>{formatDateTime(reservation.startAt)}</td><td>{formatDateTime(reservation.endAt)}</td><td>{days}</td><td>{formatCurrency(reservation.totalAmount)}</td><td>{reservationStatusLabel(reservation.status)}</td><td>{maintenanceStatusLabel(reservation.maintenanceStatus)}</td>
                     </tr>
                   );
                 })}
